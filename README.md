@@ -25,11 +25,14 @@ Basic UI
 
 Title screen\
 Level selector\
-Multiple characters\
 Passives\
+More enemies\
+Level progression (pass/fail)\
 More weapons\
 Permanent upgrades shop\
 Local saves\
+Difficulty curve + selection\
+Multiple characters\
 Splash screen\
 Custom art\
 Better UI
