@@ -1,18 +1,20 @@
-import pygame, sys
-import random, math
+import pygame, sys, time, asyncio, random, math
 
 # CONSTANTS
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 720
 GAME_WIDTH = 5000
 GAME_HEIGHT = 5000
-EXTRAS = { "Coins": {"image": "graphics/coin_large.png",
+EXTRAS = { "coins": {"name": "200 Coins",
+                "image": "graphics/coin_large.png",
                 "description": "Two hundred smackaroos!"}
             }
-WEAPONS = { "Standard": {"type": "bullet",
+WEAPONS = { "standard": {"type": "bullet",
+                "name": "Poison Shot",
                 "movement": "facing",
                 "image": "graphics/standard.png",
-                "description": "Shoots where you point.  Simple as that!",
+                "sprite": "graphics/standard_sprite.png",
+                "description": "Shoots where you point, poisons enemies!  Simple as that!",
                     0: {"cooldown": 500, "damage": 1, "lifespan": 1, "speed": 5, "amount": 1},
                     1: {"cooldown": 500, "damage": 1, "lifespan": 1, "speed": 5, "amount": 2},
                     2: {"cooldown": 500, "damage": 2, "lifespan": 1, "speed": 5, "amount": 3},
@@ -20,9 +22,11 @@ WEAPONS = { "Standard": {"type": "bullet",
                     4: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 6, "amount": 5},
                     5: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 6, "amount": 6}
             },
-            "Circling": {"type": "bullet",
+            "circling": {"type": "bullet",
+                "name": "Firespin",
                 "movement": "circling",
                 "image": "graphics/circling.png",
+                "sprite": "graphics/standard_sprite.png",
                 "description": "Does little circly thingies!",
                     0: {"cooldown": 500, "damage": 1, "lifespan": 1, "speed": 5, "amount": 1},
                     1: {"cooldown": 500, "damage": 2, "lifespan": 1, "speed": 5, "amount": 2},
@@ -31,9 +35,11 @@ WEAPONS = { "Standard": {"type": "bullet",
                     4: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 5, "amount": 5},
                     5: {"cooldown": 500, "damage": 4, "lifespan": 1, "speed": 5, "amount": 6}
             },
-            "Tracking": {"type": "bullet",
+            "tracking": {"type": "bullet",
+                "name": "Emerett's Eye",
                 "movement": "tracking",
                 "image": "graphics/tracking.png",
+                "sprite": "graphics/standard_sprite.png",
                 "description": "Follows those fuckers...",
                     0: {"cooldown": 500, "damage": 2, "lifespan": 1, "speed": 2, "amount": 1},
                     1: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 2, "amount": 2},
@@ -42,9 +48,11 @@ WEAPONS = { "Standard": {"type": "bullet",
                     4: {"cooldown": 500, "damage": 4, "lifespan": 1, "speed": 3, "amount": 3},
                     5: {"cooldown": 500, "damage": 5, "lifespan": 1, "speed": 4, "amount": 4}
             },
-            "Random": {"type": "bullet",
+            "random": {"type": "bullet",
+                "name": "Sticky Mess",
                 "movement": "random",
                 "image": "graphics/random.png",
+                "sprite": "graphics/standard_sprite.png",
                 "description": "Goes all willy-nilly, but there's lots!",
                     0: {"cooldown": 1000, "damage": 1, "lifespan": 1, "speed": 5, "amount": 5},
                     1: {"cooldown": 1000, "damage": 2, "lifespan": 1, "speed": 5, "amount": 5},
@@ -52,8 +60,42 @@ WEAPONS = { "Standard": {"type": "bullet",
                     3: {"cooldown": 1000, "damage": 3, "lifespan": 1, "speed": 6, "amount": 6},
                     4: {"cooldown": 1000, "damage": 3, "lifespan": 1, "speed": 6, "amount": 7},
                     5: {"cooldown": 1000, "damage": 4, "lifespan": 1, "speed": 6, "amount": 8}
+                }
             }
-        }
+PASSIVES = {"explosive": {"type": "passive",
+                "name": "Elixir of Chaos",
+                "image": "graphics/explosive.png",
+                "description": "Grants explosive to all projectile weapons!",
+                    0: {"explosive": True, "explosion_radius": 2},
+                    1: {"explosive": True, "explosion_radius": 3},
+                    2: {"explosive": True, "explosion_radius": 4},
+                    3: {"explosive": True, "explosion_radius": 5},
+                    4: {"explosive": True, "explosion_radius": 7},
+                    5: {"explosive": True, "explosion_radius": 10},
+                },
+            "speedup": {"type": "passive",
+                "name": "Elixir of Speed",
+                "image": "graphics/speedup.png",
+                "description": "Run faster, jump higher!",
+                    0: {"player_speed": 1.1},
+                    1: {"player_speed": 1.2},
+                    2: {"player_speed": 1.3},
+                    3: {"player_speed": 1.4},
+                    4: {"player_speed": 1.5},
+                    5: {"player_speed": 1.6},
+                },
+            "lifespan": {"type": "passive",
+                "name": "Elixir of Stone",
+                "image": "graphics/penetrate.png",
+                "description": "All projectiles get more penetrative...",
+                    0: {"projectile_lifespan": 1},
+                    1: {"projectile_lifespan": 1},
+                    2: {"projectile_lifespan": 2},
+                    3: {"projectile_lifespan": 2},
+                    4: {"projectile_lifespan": 3},
+                    5: {"projectile_lifespan": 4},
+                }
+            }
 ENEMIES = {"Drone":    {"type": "standard",
                         "movement": "follow",
                         "damage": 5,
@@ -77,17 +119,17 @@ PICKUPS = {"nothing": {"image": None,
            "heart": {"image": "graphics/heart.png",
                      "weight": 5,
                      "magnet": False,
-                     "value": ("health", 10)},
+                     "value": 10},
            "coin": {"image": "graphics/coin.png",
                     "weight": 25,
                     "magnet": True,
-                    "value": ("money", 10)},
+                    "value": 10},
            "experience": {"image": "graphics/exp.png",
                           "weight": 30,
                           "magnet": True,
-                          "value": ("exp", 3)}
+                          "value": 15}
            }
-MAPS = {"1": {"timeout": 15,
+MAPS = {"1": {"timeout": 5,
                 "background": 'graphics/ground.png',
                 "bgcolor": '#ffffff',
                 "enemies": [ENEMIES["Drone"], 
@@ -107,6 +149,15 @@ MAPS = {"1": {"timeout": 15,
             "width": 2000,
             "height": 2000}
           }
+CHARACTERS = {"Wizard Bob": 
+                {"image": "graphics/player.png",
+                 "health": 100,
+                 "health_regen": 0,
+                 "armor": 1,
+                 "speed": 2,
+                 "damage": 1,
+                 "extra_projectiles": 0,
+                 },}
 
 class CameraGroup(pygame.sprite.Group):
     def __init__(self, background):
@@ -149,10 +200,11 @@ class CameraGroup(pygame.sprite.Group):
         self.display_surf.blit(self.player.image, self.player.rect.topleft - self.offset) # Player
 
 class Pickup(pygame.sprite.Sprite):
-    def __init__(self, position, groups, item):
+    def __init__(self, position, groups, type, item):
         super().__init__(groups)
         self.image = pygame.image.load(item["image"]).convert_alpha()
         self.rect = self.image.get_rect(center = position)
+        self.type = type
         self.speed = 1
         self.item = item
         self.magnet = item["magnet"]
@@ -178,7 +230,7 @@ class Pickup(pygame.sprite.Sprite):
     
     def check_collision(self, player):
         if pygame.sprite.collide_rect(self, player):
-            player.collect(self.item)
+            player.collect(self.type, self.item)
             self.kill()
             
 class Enemy(pygame.sprite.Sprite):
@@ -192,11 +244,25 @@ class Enemy(pygame.sprite.Sprite):
         self.image = pygame.image.load('graphics/enemy.png').convert_alpha()
         self.rect = self.image.get_rect(center = position)
         self.dir = (0,0)
-        self.enemy = template
+        self.health = template["health"]
+        self.damage = template["damage"]
+        self.is_damaged = False
+        self.flash_end_time = 0
+        self.flash_duration = 100
+        self.flash_color = (255, 255, 255)
+        self.original_image = self.image.copy()
     
     def update(self, player, enemy_group):
-        self.move(player, enemy_group)
-        self.check_collision(player)
+        if pygame.time.get_ticks() < self.flash_end_time:
+            flash_surface = pygame.Surface(self.rect.size).convert_alpha()
+            flash_surface.fill(self.flash_color)
+            self.image.blit(flash_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+        else:
+            if self.is_damaged == True:
+                self.image.blit(self.original_image, (0,0))
+                self.is_damaged = False
+            self.move(player, enemy_group)
+            self.check_collision(player)
         
     def move(self, player, enemy_group):
         delta_x = player.rect.centerx - self.rect.centerx
@@ -207,19 +273,15 @@ class Enemy(pygame.sprite.Sprite):
 
         new_x = self.rect.x + self.dir[0] * self.max_speed
         new_y = self.rect.y + self.dir[1] * self.max_speed
-
-        # Apply acceleration and friction
         if self.dir != (0, 0):
             self.velocity += pygame.math.Vector2(self.dir[0] * self.max_speed, self.dir[1] * self.max_speed) * self.acceleration
         else:
             friction_force = -self.velocity * self.friction
             self.velocity += friction_force
 
-        # Limit the maximum speed
         if self.velocity.length() > self.max_speed:
             self.velocity.scale_to_length(self.max_speed)
 
-        # Check and update position for collisions
         collision_rect = self.rect.inflate(-self.rect.width // 2, -self.rect.height // 2)
         collision_rect.topleft = (new_x + self.rect.width // 4, new_y + self.rect.height // 4)
         for enemy in enemy_group:
@@ -237,25 +299,31 @@ class Enemy(pygame.sprite.Sprite):
     
     def check_collision(self, player):
         if pygame.sprite.collide_rect(self, player):
-            player.damaged(self.enemy["damage"])
+            player.damaged(self.damage)
         
     def damaged(self, damage):
-        self.enemy["health"] -= damage
-        if self.enemy["health"] <= 0:
+        self.flash_end_time = pygame.time.get_ticks() + self.flash_duration
+        self.is_damaged = True
+        self.health -= damage
+        if self.health <= 0:
             self.current_map.spawn_pickup(self.rect.center)
             self.kill()
     
 class Bullet(pygame.sprite.Sprite):
-    def __init__(self, position, groups, direction, weapon, level, radius = None):
+    def __init__(self, position, groups, direction, weapon, level, modifiers, radius = None,):
         super().__init__(groups)
         self.image = pygame.image.load('graphics/bullet.png').convert_alpha()
         self.rect = self.image.get_rect(center = position)
+        self.type = weapon["movement"]
         self.dir = direction
-        self.level = level
         self.radius = radius
-        self.angle = 0
+        self.explosive = modifiers["explosive"]
+        self.explosion_radius = modifiers["explosion_radius"] + modifiers["power_radius"]
+        self.projectile_speed = weapon[level]["speed"] * modifiers["projectile_speed_mult"]
+        self.damage = (weapon[level]["damage"] + modifiers["damage"]) * modifiers["damage_mult"]
+        self.lifespan = weapon[level]["lifespan"] + modifiers["projectile_lifespan"]
         self.target = None
-        self.weapon = weapon
+        self.angle = 0
 
     def update(self, player, enemy_group):
         self.move(player, enemy_group)
@@ -267,8 +335,8 @@ class Bullet(pygame.sprite.Sprite):
             self.collide(collision)
         
     def move(self, player, enemy_group):
-        if self.weapon["movement"] == "circling":
-            self.angle += self.weapon[self.level]["speed"]
+        if self.type == "circling":
+            self.angle += self.projectile_speed
             if self.angle >= 360:
                 self.angle -= 360
             angle = math.radians(self.angle)
@@ -276,7 +344,7 @@ class Bullet(pygame.sprite.Sprite):
             self.rect.y = player.rect.centery + self.radius * math.sin(angle)
             self.radius += 1
             
-        elif self.weapon["movement"] == "tracking":
+        elif self.type == "tracking":
             if self.target is None:
                 nearest_enemy = None
                 min_distance = float('inf')
@@ -294,71 +362,90 @@ class Bullet(pygame.sprite.Sprite):
                     if distance > 0:
                         self.dir = (delta_x / distance, delta_y / distance)
 
-                self.rect.x = self.rect.x + self.dir[0] * self.weapon[self.level]["speed"]
-                self.rect.y = self.rect.y + self.dir[1] * self.weapon[self.level]["speed"]
+                self.rect.x = self.rect.x + self.dir[0] * self.projectile_speed
+                self.rect.y = self.rect.y + self.dir[1] * self.projectile_speed
         else:
-            self.rect.x = self.rect.x + self.dir[0] * self.weapon[self.level]["speed"]
-            self.rect.y = self.rect.y + self.dir[1] * self.weapon[self.level]["speed"]
+            self.rect.x = self.rect.x + self.dir[0] * self.projectile_speed
+            self.rect.y = self.rect.y + self.dir[1] * self.projectile_speed
         
     def collide(self, target):
-        target.damaged(self.weapon[self.level]["damage"])
-        if self.weapon[self.level]["lifespan"] is not None:
-            self.weapon[self.level]["lifespan"] -= 1
-            if self.weapon[self.level]["lifespan"] <= 0:
+        target.damaged(self.damage)
+        if self.lifespan is not None:
+            self.lifespan -= 1
+            if self.lifespan <= 0:
                 self.kill()
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, position, group, weapon_name, current_map):
         super().__init__(group)
-        self.acceleration = 0.2
-        self.friction = 0.1
-        self.velocity = pygame.math.Vector2(0, 0)
-        self.weapons = [[weapon_name, 0]]
-        self.level = 0
         self.current_map = current_map
+        self.weapons = [[weapon_name, 0]]
+        self.passives = []
+        self.modifiers = {"damage": 0,
+                          "explosive": False,
+                          "explosion_radius": 0,
+                          "pickup_radius": 0,
+                          "power_radius": 0,
+                          "projectile_lifespan": 0,
+                          "extra_projectiles": 0,
+                          "health_regen": 0,
+                          "armor": 0,
+                          "luck": 0,
+                          "exp_mult": 1,
+                          "heal_mult": 1,
+                          "gold_mult": 1,
+                          "speed_mult": 1,
+                          "radius_mult": 1,
+                          "damage_mult": 1,
+                          "cooldown_mult": 1,
+                          "duration_mult": 1,
+                          "invincibility_mult": 1,
+                          "projectile_speed_mult": 1,
+                          }
         self.image = pygame.image.load('graphics/player.png').convert_alpha()
         self.rect = self.image.get_rect(topleft = position)
         self.pickup_circle = self.rect
-        self.direction = pygame.math.Vector2()
-        self.max_speed = 2
+        self.invincible = False
+        self.friction = 0.1
+        self.max_speed = 2.0
+        self.acceleration = 0.2
+        self.velocity = pygame.math.Vector2(0, 0)
+        self.animating = False
+        self.animation = 0
+        self.frame = 0
+        self.level = 0
+        self.lives = 1
         self.health = 100
-        self.max_health = self.health
+        self.health_regen = 0
+        self.damage = 1
+        self.armor = 1
         self.money = 0
         self.exp = 0
         self.exp_curve = 1.2
         self.exp_to_level = 15
+        self.extra_projectiles = 0
+        self.max_health = self.health
+        self.flash_color = pygame.Color(255,0,0)
+        self.original_image = self.image.copy()
     
     def move(self):
+        max_speed = self.max_speed * self.modifiers["speed_mult"]
         keys = pygame.key.get_pressed()
-        move_direction = pygame.math.Vector2(0, 0)
-        
-        if keys[pygame.K_UP]:
-            move_direction.y = -1
-        elif keys[pygame.K_DOWN]:
-            move_direction.y = 1
-            
-        if keys[pygame.K_LEFT]:
-            move_direction.x = -1
-        elif keys[pygame.K_RIGHT]:
-            move_direction.x = 1
-        
-        if keys[pygame.K_2]:
-            self.exp += 1
-            
-        if move_direction.length() > 0:
-            move_direction.normalize_ip()
-
-        if move_direction.length() > 0:
-            self.velocity += move_direction * self.acceleration
+        if keys[pygame.K_UP] and not keys[pygame.K_DOWN]:
+            self.velocity.y = max(self.velocity.y - self.acceleration, -max_speed)
+        elif keys[pygame.K_DOWN] and not keys[pygame.K_UP]:
+            self.velocity.y = min(self.velocity.y + self.acceleration, max_speed)
         else:
-            friction_force = -self.velocity * self.friction
-            self.velocity += friction_force
-            
-        if self.velocity.length() > self.max_speed:
-            self.velocity.scale_to_length(self.max_speed)
+            self.velocity.y *= (1 - self.friction)
 
-        self.direction = self.velocity
-        self.rect.center += self.direction
+        if keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
+            self.velocity.x = max(self.velocity.x - self.acceleration, -max_speed)
+        elif keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT]:
+            self.velocity.x = min(self.velocity.x + self.acceleration, max_speed)
+        else:
+            self.velocity.x *= (1 - self.friction)
+            
+        self.rect.center += self.velocity
             
     def shoot(self, weapon, level, groups):
         for i in range(0, weapon[level]["amount"]):
@@ -383,33 +470,70 @@ class Player(pygame.sprite.Sprite):
             
             normal = math.sqrt(distance[0] ** 2 + distance[1] ** 2)
             direction = [distance[0] / normal, distance[1] / normal]
-            Bullet(position, groups, (direction[0], direction[1]), weapon, level, radius)
+            Bullet(position, groups, (direction[0], direction[1]), weapon, level, self.modifiers, radius)
 
     def level_up(self):
         self.level += 1
         self.exp = 0
         self.exp_to_level *= self.exp_curve
-        self.current_map.running = False
-        self.current_map.pause_loop("levelup")
+        set_gamestate("levelup")
     
-    def collect(self, item):
-        setattr(self, item["value"][0], int(getattr(self, item["value"][0]) + item["value"][1]))
-        if self.health >= self.max_health:
-            self.health = self.max_health
-        
+    def collect(self, type, item):
+        if type == "coin":
+            self.money += math.ceil(item["value"] * self.modifiers["gold_mult"])
+            
+        elif type == "heart":
+            self.heal(item["value"])
+            
+        elif type == "experience":
+            self.exp += item["value"] * self.modifiers["exp_mult"]
+            if self.exp >= self.exp_to_level:
+                self.level_up()
+
+    def heal(self, amount):
+        full_amount = math.ceil(amount * self.modifiers["heal_mult"])
+        self.health = self.max_health if self.health + full_amount >= self.max_health else self.health + full_amount
+
     def damaged(self, damage):
-        self.health -= damage
+        if not self.invincible:
+            self.health -= max(damage - (self.armor + self.modifiers["armor"]), 0)
+            invincibility_time = 500 * self.modifiers["invincibility_mult"]
+            self.animating = True
+            self.animation = 10
+            self.invincible = True
+            
+        if self.health <= 0:
+            self.lives -= 1
+
+        if self.lives == 0:
+            self.current_map.failed()
         
+    def damageable(self):
+        self.invincible = False
+
     def update(self, player, enemy_group):
-        if self.exp >= self.exp_to_level:
-            self.level_up()
+        if self.animating:
+            if self.frame > self.animation:
+                self.frame = 0
+                self.animating = False
+                self.image.blit(self.original_image, (0,0))
+            else:
+                self.frame += 1
+                fade_factor = 1 - (self.frame/10)
+                red_component = int(self.flash_color.r * fade_factor)
+                flash_color = pygame.Color(red_component, self.flash_color.g, self.flash_color.b, self.flash_color.a)
+                flash_surface = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+                flash_surface.fill(flash_color)
+                self.image.blit(flash_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+                
+            
         self.move()
 
 class CurrentMap():
     def __init__(self, current_map, difficulty):
         self.running = True
         self.finished_upgrades = []
-        self.available_upgrades = list(WEAPONS.keys())
+        self.available_upgrades = list(WEAPONS.keys()) + list(PASSIVES.keys())
         self.timeout = current_map["timeout"] * 60
         self.enemies = current_map["enemies"]
         self.bosses = current_map["bosses"]
@@ -423,21 +547,11 @@ class CurrentMap():
         self.title_font = pygame.font.Font(None, 48)
         self.stats_font = pygame.font.Font(None, 16)
         pygame.time.set_timer(pygame.USEREVENT, 1000)
+        self.choices = random.sample(self.available_upgrades, 5)
         self.load_map()
-        self.set_weapons()
-        self.map_loop()
-        
-    def load_map(self):
-        self.camera_group = CameraGroup(self.ground)
-        self.player = Player((self.width // 2, self.height // 2), self.camera_group, "Standard", self)
-        self.camera_group.set_player(self.player)
+        self.set_powers()
     
-    def random_point_on_circle(self, center_x, center_y, radius):
-        angle = random.uniform(0, 2 * math.pi)
-        x = center_x + radius * math.cos(angle)
-        y = center_y + radius * math.sin(angle)
-        return (x, y)
-    
+    # ------------------------ SPAWNING ------------------------
     def spawn_enemies(self, enemy, amount):
         for i in range(0, amount):
             Enemy(self.random_point_on_circle(self.player.rect.centerx,
@@ -451,12 +565,12 @@ class CurrentMap():
     def spawn_pickup(self, pos):
         random_pickup = random.choices(list(PICKUPS.keys()), weights=[pickup["weight"] for pickup in PICKUPS.values()], k = 1)
         if random_pickup[0] != "nothing":
-            Pickup(pos, [self.camera_group, self.camera_group.pickup_group], PICKUPS[random_pickup[0]])
+            Pickup(pos, [self.camera_group, self.camera_group.pickup_group], random_pickup[0], PICKUPS[random_pickup[0]])
 
+    # ------------------------ MISC ------------------------
     def level_up(self, choice):
         if choice in list(EXTRAS.keys()):
             self.player.money += 200
-            return
             
         for weapon in self.player.weapons:
             if choice == weapon[0]:
@@ -466,31 +580,98 @@ class CurrentMap():
                     if len(self.available_upgrades) < 3:
                         self.available_upgrades.append("Coins")
                     self.finished_upgrades.append(choice)
-                    print(self.available_upgrades, self.finished_upgrades)
-                return
+                break
 
-        self.player.weapons.append([choice, 0])
+        for passive in self.player.passives:
+            if choice == passive[0]:
+                passive[1] += 1
+                if passive[1] >= 5:
+                    self.available_upgrades = [key for key in self.available_upgrades if key != choice]
+                    if len(self.available_upgrades) < 3:
+                        self.available_upgrades.append("Coins")
+                    self.finished_upgrades.append(choice)
+                break
+            
+        if choice in WEAPONS.keys():
+            self.player.weapons.append([choice, 0])
+        else:
+            self.player.passives.append([choice, 0])
         
+        self.choices = random.sample(current_map.available_upgrades, 5)
+        self.set_powers()
+    
+    def set_powers(self):
+        i = 0
+        for weapon in self.player.weapons:
+            pygame.time.set_timer(100 + i, WEAPONS[weapon[0]][weapon[1]]["cooldown"])
+            i += 1
+        for passive in self.player.passives:
+            for key, value in PASSIVES[passive[0]][passive[1]].items():
+                self.player.modifiers[key] = value
+        pygame.time.set_timer(98, 5000)
+
+    def load_map(self):
+        self.camera_group = CameraGroup(self.ground)
+        self.player = Player((self.width // 2, self.height // 2), self.camera_group, "standard", self)
+        self.camera_group.set_player(self.player)
+    
+    def random_point_on_circle(self, center_x, center_y, radius):
+        angle = random.uniform(0, 2 * math.pi)
+        x = center_x + radius * math.cos(angle)
+        y = center_y + radius * math.sin(angle)
+        return (x, y)
+    
+    def draw_text(self, surface, text, font, color, rect, max_width=None):
+        words = text.split(' ')
+        space_width, _ = font.size(' ')
+
+        lines = []
+        current_line = []
+        current_width = 0
+
+        for word in words:
+            word_width, word_height = font.size(word)
+
+            if max_width and current_width + word_width > max_width:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+                current_width = word_width + space_width
+            else:
+                current_line.append(word)
+                current_width += word_width + space_width
+
+        lines.append(' '.join(current_line))
+
+        y = rect.centery - (len(lines) - 1) * word_height // 2
+
+        for line in lines:
+            text_surface = font.render(line, True, color)
+            text_rect = text_surface.get_rect(center=(rect.centerx, y))
+            surface.blit(text_surface, text_rect)
+            y += word_height
+            
+    # ------------------------ UI ------------------------
     def display_box(self, x, y, width, height, title, image_path, second_title, text):
-        box_surface = pygame.Surface((width, height))
-        box_surface.fill('#ffffff')
-        image = pygame.image.load(image_path)
-        image_rect = image.get_rect(center=(width // 2, height // 2 - 20))
+        box_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        background_image = pygame.image.load("graphics/upgrade_bg.png").convert_alpha()
+        box_surface.blit(background_image, (0, 0))
+        image = pygame.image.load(image_path).convert_alpha()
+        image_rect = image.get_rect(center=(width // 2, height // 2 - 22))
         box_surface.blit(image, image_rect)
-        font_title = pygame.font.Font(None, 24)
+        font_title = pygame.font.Font(None, 22)
         font_text = pygame.font.Font(None, 16)
         title_text = font_title.render(title, True, (0, 0, 0))
+        title_rect = title_text.get_rect(center=(width // 2, 13))
         second_title_text = font_title.render(second_title, True, (0, 0, 0))
-        title_rect = title_text.get_rect(center=(width // 2, 20))
-        second_title_rect = second_title_text.get_rect(center=(width // 2, 40))
-        text_text = font_text.render(text, True, (0, 0, 0))
-        text_rect = text_text.get_rect(center=(width // 2, height // 2 + 80))
+        second_title_rect = second_title_text.get_rect(center=(width // 2, 33))
+        text_rect = pygame.Rect(0, 0, width, height + 165)
+        self.draw_text(box_surface, text, font_text, (255, 255, 255), text_rect, max_width=text_rect.width - 67)
         box_surface.blit(title_text, title_rect)
         box_surface.blit(second_title_text, second_title_rect)
-        box_surface.blit(text_text, text_rect)
         screen.blit(box_surface, (x, y))
         
-    def levelup_ui(self, choices):
+    def levelup_ui(self):
+        choices = self.choices
         transparent_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         pygame.draw.rect(transparent_bg, (0, 0, 0, 128), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
         screen.blit(transparent_bg, (0,0))
@@ -500,11 +681,18 @@ class CurrentMap():
             for weapon in self.player.weapons:
                 if choice == weapon[0]:
                     level = f'Level {weapon[1] + 1}'
+            for passive in self.player.passives:
+                if choice == passive[0]:
+                    level = f'Level {passive[1] + 1}'
+                    
             if choice in WEAPONS.keys():
                 item = WEAPONS[choice]
+            elif choice in PASSIVES.keys():
+                item = PASSIVES[choice]
             else:
                 item = EXTRAS[choice]
-            self.display_box(50 + (250 * i), 100, 200, 300, level, item["image"], choice, item["description"])
+                
+            self.display_box(40 + (250 * i), 100, 200, 300, level, item["image"], item["name"], item["description"])
             i += 1
     
     def pause_ui(self):
@@ -523,11 +711,6 @@ class CurrentMap():
         money = self.stats_font.render(f'Money: {self.player.money}', True, (255, 255, 255))
         money_rect = money.get_rect(topleft=(10, SCREEN_HEIGHT - 20))
         screen.blit(money, money_rect)
-
-        # FPS
-        fps = self.stats_font.render(f'FPS: {round(clock.get_fps(), 2)}', True, (255, 255, 255))
-        fps_rect = fps.get_rect(topleft=(10, 10))
-        screen.blit(fps, fps_rect)
         
         # Health bar
         health_ratio = self.player.health / self.player.max_health
@@ -547,100 +730,107 @@ class CurrentMap():
         screen.blit(transparent_bg, (experience_bar_x, experience_bar_y))
         pygame.draw.rect(screen, (0, 255, 0), (experience_bar_x, experience_bar_y, self.bar_width * experience_ratio, self.bar_height // 2))
     
-    def set_weapons(self):
-        i = 0
-        for weapon in self.player.weapons:
-            pygame.time.set_timer(100 + i, WEAPONS[weapon[0]][weapon[1]]["cooldown"])
-            i += 1
-            
-    def pause_loop(self, type):
-        choices = random.sample(self.available_upgrades, 3)
-        box1_rect = pygame.Rect(50, 100, 200, 300)
-        box2_rect = pygame.Rect(300, 100, 200, 300)
-        box3_rect = pygame.Rect(550, 100, 200, 300)
-        while not self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-                
-                if event.type == pygame.KEYDOWN and type == "pause":
-                    if event.key == pygame.K_0:
-                        self.running = True
-                        self.map_loop()
-                
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    if box1_rect.collidepoint(mouse_x, mouse_y):
-                        self.level_up(choices[0])
-                        self.set_weapons()
-                        self.running = True
-                        self.map_loop()
-
-                    elif box2_rect.collidepoint(mouse_x, mouse_y):
-                        self.level_up(choices[1])
-                        self.set_weapons()
-                        self.running = True
-                        self.map_loop()
-                        
-                    elif box3_rect.collidepoint(mouse_x, mouse_y):
-                        self.level_up(choices[2])
-                        self.set_weapons()
-                        self.running = True
-                        self.map_loop()
-
-            screen.fill(self.ground_fill)
-            self.camera_group.custom_draw(self.player)
-            self.map_ui()
-            if type == "pause":
-                self.pause_ui()
-            elif type == "levelup":
-                self.levelup_ui(choices)
-            
-            pygame.display.update()
-            clock.tick(60)
-
-    def map_loop(self):
-        while self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.USEREVENT:
-                    self.timeout -= 1
-                    if len(self.camera_group.enemy_group) <= 100:
-                        self.spawn_enemies(self.enemies[0], random.randrange(1, 5))
-                        
-                if event.type in range(100, 100 + len(WEAPONS) - 1):
-                    if WEAPONS[self.player.weapons[event.type - 100][0]]["type"] == "bullet":
-                        self.player.shoot(WEAPONS[self.player.weapons[event.type - 100][0]], self.player.weapons[event.type - 100][1], [self.camera_group, self.camera_group.projectile_group])
-                    
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_0:
-                        self.running = False
-                        self.pause_loop("pause")
-                    
-                    if event.key == pygame.K_1:
-                        for pickup in self.camera_group.pickup_group:
-                            if pickup.magnet:
-                                pickup.moving = True
-                        
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-
-            screen.fill(self.ground_fill)
-            self.camera_group.update(self.player, self.camera_group.enemy_group)
-            self.camera_group.custom_draw(self.player)
-            self.map_ui()
-            
-            pygame.display.update()
-            clock.tick(60)
-            
-    def map_failed(self):
+    def failed(self):
         pass
     
-    def map_passed(self):
-        pass
-
 pygame.init()
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-clock = pygame.time.Clock()
-CurrentMap(MAPS["1"], 1)
+event_handler = ...
+drawables = [...]
+game_state = "gameplay"
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),flags=pygame.SCALED, vsync=1)
+current_map = CurrentMap(MAPS["1"], 1)
+
+def set_gamestate(action):
+    global game_state
+    if action == "toggle":
+        if game_state == "paused":
+            game_state = "gameplay"
+        else:
+            game_state = "paused"
+    else:
+        game_state = action
+    
+async def game_loop(framerate_limit=math.inf):
+    loop = asyncio.get_event_loop()
+    next_frame_target = 0.0
+    limit_frame_duration = (1.0 / framerate_limit)
+
+    while True:
+        if limit_frame_duration:
+            this_frame = time.time()
+            delay = next_frame_target - this_frame
+            if delay > 0:
+                await asyncio.sleep(delay)
+            next_frame_target = this_frame + limit_frame_duration
+            
+        if game_state in ("gameplay", "paused", "levelup"):
+            screen.fill(current_map.ground_fill)
+            current_map.camera_group.custom_draw(current_map.player)
+            if game_state == "gameplay":
+                current_map.camera_group.update(current_map.player, current_map.camera_group.enemy_group)
+            
+            current_map.map_ui()
+            if game_state in ("paused", "levelup"):
+                current_map.pause_ui()
+                if game_state == "levelup":
+                    current_map.levelup_ui()
+                
+        events_to_handle = list(pygame.event.get())
+        events_handled = loop.create_task(handle_events(events_to_handle))
+        await loop.run_in_executor(None, pygame.display.update)
+        await events_handled
+
+async def handle_events(events_to_handle):
+    box1_rect = pygame.Rect(40, 100, 200, 300)
+    box2_rect = pygame.Rect(290, 100, 200, 300)
+    box3_rect = pygame.Rect(540, 100, 200, 300)
+    box4_rect = pygame.Rect(790, 100, 200, 300)
+    box5_rect = pygame.Rect(1040, 100, 200, 300)
+    for event in events_to_handle:
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+        if current_map is not None:
+            if event.type == pygame.USEREVENT:
+                current_map.timeout -= 1
+                if len(current_map.camera_group.enemy_group) <= 1:
+                    current_map.spawn_enemies(current_map.enemies[0], random.randrange(1, 5))
+
+            if event.type == 98:
+                current_map.player.heal(current_map.player.modifiers["health_regen"])
+
+            if event.type == 99:
+                current_map.player.damageable()
+                
+            if event.type in range(100, 100 + len(WEAPONS) - 1):
+                if WEAPONS[current_map.player.weapons[event.type - 100][0]]["type"] == "bullet":
+                    current_map.player.shoot(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
+                                             current_map.player.weapons[event.type - 100][1], 
+                                             [current_map.camera_group, current_map.camera_group.projectile_group])
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_0:
+                    set_gamestate("toggle")
+
+                if event.key == pygame.K_1:
+                    for pickup in current_map.camera_group.pickup_group:
+                        if pickup.magnet:
+                            pickup.moving = True
+            
+            if event.type == pygame.MOUSEBUTTONDOWN and game_state == "levelup":
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if box1_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[0])
+                elif box2_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[1]) 
+                elif box3_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[2])
+                elif box4_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[3])
+                elif box5_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[4])
+                else:
+                    continue
+
+asyncio.run(game_loop(120))
