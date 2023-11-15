@@ -10,6 +10,7 @@ pygame
 
 ## Updates
 
+> Offloaded collision detection 
 > Added passives and a passive system
 > Added names to weapons and passives
 > Added weapon sprites
@@ -37,7 +38,8 @@ Basic UI\
 Passives\
 Better movement\
 Better pickup management\
-More modifiers
+More modifiers\
+Async engine\
 
 ### To Do
 
@@ -54,4 +56,5 @@ Difficulty curve + selection\
 Multiple characters\
 Splash screen\
 Custom art\
-Better UI
+Better UI\
+Rewrite collision detection using groupecollides and spritecollides

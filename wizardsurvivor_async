@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import pygame, sys, time, asyncio, random, math
 
 # CONSTANTS
@@ -5,15 +6,13 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 GAME_WIDTH = 5000
 GAME_HEIGHT = 5000
-EXTRAS = { "coins": {"name": "200 Coins",
-                "image": "graphics/coin_large.png",
+EXTRAS = { "200 Coins": {"image": "graphics/coin_large.png",
                 "description": "Two hundred smackaroos!"}
             }
-WEAPONS = { "standard": {"type": "bullet",
-                "name": "Poison Shot",
+WEAPONS = { "Poison Shot": {"type": "bullet",
                 "movement": "facing",
-                "image": "graphics/standard.png",
-                "sprite": "graphics/standard_sprite.png",
+                "image": "graphics/poisonshot.png",
+                "sprite": "graphics/poisonshot_sprite.png",
                 "description": "Shoots where you point, poisons enemies!  Simple as that!",
                     0: {"cooldown": 500, "damage": 1, "lifespan": 1, "speed": 5, "amount": 1},
                     1: {"cooldown": 500, "damage": 1, "lifespan": 1, "speed": 5, "amount": 2},
@@ -22,11 +21,10 @@ WEAPONS = { "standard": {"type": "bullet",
                     4: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 6, "amount": 5},
                     5: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 6, "amount": 6}
             },
-            "circling": {"type": "bullet",
-                "name": "Firespin",
+            "Firespin": {"type": "bullet",
                 "movement": "circling",
-                "image": "graphics/circling.png",
-                "sprite": "graphics/standard_sprite.png",
+                "image": "graphics/firespin.png",
+                "sprite": "graphics/firespin_sprite.png",
                 "description": "Does little circly thingies!",
                     0: {"cooldown": 500, "damage": 1, "lifespan": 1, "speed": 5, "amount": 1},
                     1: {"cooldown": 500, "damage": 2, "lifespan": 1, "speed": 5, "amount": 2},
@@ -35,11 +33,10 @@ WEAPONS = { "standard": {"type": "bullet",
                     4: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 5, "amount": 5},
                     5: {"cooldown": 500, "damage": 4, "lifespan": 1, "speed": 5, "amount": 6}
             },
-            "tracking": {"type": "bullet",
-                "name": "Emerett's Eye",
+            "Emerett's Eye": {"type": "bullet",
                 "movement": "tracking",
-                "image": "graphics/tracking.png",
-                "sprite": "graphics/standard_sprite.png",
+                "image": "graphics/emerettseye.png",
+                "sprite": "graphics/emerettseye_sprite.png",
                 "description": "Follows those fuckers...",
                     0: {"cooldown": 500, "damage": 2, "lifespan": 1, "speed": 2, "amount": 1},
                     1: {"cooldown": 500, "damage": 3, "lifespan": 1, "speed": 2, "amount": 2},
@@ -48,11 +45,10 @@ WEAPONS = { "standard": {"type": "bullet",
                     4: {"cooldown": 500, "damage": 4, "lifespan": 1, "speed": 3, "amount": 3},
                     5: {"cooldown": 500, "damage": 5, "lifespan": 1, "speed": 4, "amount": 4}
             },
-            "random": {"type": "bullet",
-                "name": "Sticky Mess",
+            "Sticky Mess": {"type": "bullet",
                 "movement": "random",
-                "image": "graphics/random.png",
-                "sprite": "graphics/standard_sprite.png",
+                "image": "graphics/stickymess.png",
+                "sprite": "graphics/stickymess_sprite.png",
                 "description": "Goes all willy-nilly, but there's lots!",
                     0: {"cooldown": 1000, "damage": 1, "lifespan": 1, "speed": 5, "amount": 5},
                     1: {"cooldown": 1000, "damage": 2, "lifespan": 1, "speed": 5, "amount": 5},
@@ -62,8 +58,7 @@ WEAPONS = { "standard": {"type": "bullet",
                     5: {"cooldown": 1000, "damage": 4, "lifespan": 1, "speed": 6, "amount": 8}
                 }
             }
-PASSIVES = {"explosive": {"type": "passive",
-                "name": "Elixir of Chaos",
+PASSIVES = {"Elixir of Chaos": {"type": "passive",
                 "image": "graphics/explosive.png",
                 "description": "Grants explosive to all projectile weapons!",
                     0: {"explosive": True, "explosion_radius": 2},
@@ -73,8 +68,7 @@ PASSIVES = {"explosive": {"type": "passive",
                     4: {"explosive": True, "explosion_radius": 7},
                     5: {"explosive": True, "explosion_radius": 10},
                 },
-            "speedup": {"type": "passive",
-                "name": "Elixir of Speed",
+            "Elixir of Speed": {"type": "passive",
                 "image": "graphics/speedup.png",
                 "description": "Run faster, jump higher!",
                     0: {"player_speed": 1.1},
@@ -84,8 +78,7 @@ PASSIVES = {"explosive": {"type": "passive",
                     4: {"player_speed": 1.5},
                     5: {"player_speed": 1.6},
                 },
-            "lifespan": {"type": "passive",
-                "name": "Elixir of Stone",
+            "Elixir of Stone": {"type": "passive",
                 "image": "graphics/penetrate.png",
                 "description": "All projectiles get more penetrative...",
                     0: {"projectile_lifespan": 1},
@@ -97,23 +90,26 @@ PASSIVES = {"explosive": {"type": "passive",
                 }
             }
 ENEMIES = {"Drone":    {"type": "standard",
+                        "image": "graphics/enemy.png",
                         "movement": "follow",
                         "damage": 5,
                         "health": 5,
                         "speed": 1},
            "Worker":   {"type": "fast",
+                        "image": "graphics/enemy2.png",
                         "movement": "follow",
                         "damage": 3,
                         "health": 2,
-                        "speed": 2},
+                        "speed": 4},
            "Tank":     {"type": "tank",
+                        "image": "graphics/enemy3.png",
                         "movement": "follow",
                         "damage": 4,
                         "health": 10,
                         "speed": 1},
            }
 PICKUPS = {"nothing": {"image": None,
-                       "weight": 40,
+                       "weight": 39,
                        "magnet": False,
                        "value": "0"},
            "heart": {"image": "graphics/heart.png",
@@ -127,27 +123,42 @@ PICKUPS = {"nothing": {"image": None,
            "experience": {"image": "graphics/exp.png",
                           "weight": 30,
                           "magnet": True,
-                          "value": 15}
+                          "value": 15},
+           "magnet": {"image": "graphics/magnet.png",
+                      "weight": 1,
+                      "magnet": False,
+                      "value": None}
            }
 MAPS = {"1": {"timeout": 5,
                 "background": 'graphics/ground.png',
                 "bgcolor": '#ffffff',
+                "width": 2000,
+                "height": 2000,
                 "enemies": [ENEMIES["Drone"], 
                             ENEMIES["Worker"], 
                             ENEMIES["Tank"]],
+                "minibosses": [],
                 "bosses": [],
-                "waves": [50, 50, 100, 100],
+                "waves": {1: [(0,2), (0,0), (0,0)],
+                          2: [(2,4), (0,0), (0,1)],
+                          3: [(2,4), (0,0), (1,3)],
+                          4: [(2,5), (0,0), (2,4)],
+                          5: [(0,0), (5,6), (0,0)]},},
+        "2": {"timeout": 5,
+                "background": 'graphics/ground.png',
+                "bgcolor": '#ffffff',
                 "width": 2000,
-                "height": 2000},
-        "2": {"timeout": 15,
-            "background": '',
-            "enemies": [ENEMIES["Drone"], 
-                        ENEMIES["Worker"], 
-                        ENEMIES["Tank"]],
-            "bosses": [],
-            "waves": [50, 50, 100, 100],
-            "width": 2000,
-            "height": 2000}
+                "height": 2000,
+                "enemies": [ENEMIES["Drone"], 
+                            ENEMIES["Worker"], 
+                            ENEMIES["Tank"]],
+                "minibosses": [],
+                "bosses": [],
+                "waves": {1: [(0,2), (0,0), (0,0)],
+                          2: [(2,4), (0,0), (0,1)],
+                          3: [(2,4), (0,0), (1,3)],
+                          4: [(2,5), (0,0), (2,4)],
+                          5: [(0,0), (5,6), (0,0)]},}
           }
 CHARACTERS = {"Wizard Bob": 
                 {"image": "graphics/player.png",
@@ -234,14 +245,15 @@ class Pickup(pygame.sprite.Sprite):
             self.kill()
             
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self, position, groups, template, current_map):
+    def __init__(self, position, groups, template, current_map, target = None):
         super().__init__(groups)
         self.current_map = current_map
         self.acceleration = 0.1
         self.friction = 0.05
+        self.target = target
         self.velocity = pygame.math.Vector2(0, 0)
         self.max_speed = template["speed"]
-        self.image = pygame.image.load('graphics/enemy.png').convert_alpha()
+        self.image = pygame.image.load(template["image"]).convert_alpha()
         self.rect = self.image.get_rect(center = position)
         self.dir = (0,0)
         self.health = template["health"]
@@ -262,11 +274,11 @@ class Enemy(pygame.sprite.Sprite):
                 self.image.blit(self.original_image, (0,0))
                 self.is_damaged = False
             self.move(player, enemy_group)
-            self.check_collision(player)
         
     def move(self, player, enemy_group):
-        delta_x = player.rect.centerx - self.rect.centerx
-        delta_y = player.rect.centery - self.rect.centery
+        target = self.target if self.target is not None else player.rect.center
+        delta_x = target[0] - self.rect.centerx
+        delta_y = target[1] - self.rect.centery
         distance = math.hypot(delta_x, delta_y)
         if distance > 0:
             self.dir = (delta_x / distance, delta_y / distance)
@@ -296,10 +308,6 @@ class Enemy(pygame.sprite.Sprite):
 
         self.rect.x = new_x
         self.rect.y = new_y
-    
-    def check_collision(self, player):
-        if pygame.sprite.collide_rect(self, player):
-            player.damaged(self.damage)
         
     def damaged(self, damage):
         self.flash_end_time = pygame.time.get_ticks() + self.flash_duration
@@ -312,8 +320,9 @@ class Enemy(pygame.sprite.Sprite):
 class Bullet(pygame.sprite.Sprite):
     def __init__(self, position, groups, direction, weapon, level, modifiers, radius = None,):
         super().__init__(groups)
-        self.image = pygame.image.load('graphics/bullet.png').convert_alpha()
-        self.rect = self.image.get_rect(center = position)
+        self.original_image = pygame.image.load(weapon["sprite"]).convert_alpha()
+        self.image = self.original_image
+        self.rect = self.image.get_rect(center=position)
         self.type = weapon["movement"]
         self.dir = direction
         self.radius = radius
@@ -329,12 +338,45 @@ class Bullet(pygame.sprite.Sprite):
         self.move(player, enemy_group)
         if (abs(self.rect.centerx - player.rect.centerx) > SCREEN_WIDTH or abs(self.rect.centery - player.rect.centery) > SCREEN_HEIGHT):
             self.kill()
-        
-        collision = pygame.sprite.spritecollideany(self, enemy_group)
-        if collision is not None:
-            self.collide(collision)
-        
+            
     def move(self, player, enemy_group):
+        if self.type == "circling":
+            self.angle += self.projectile_speed
+            if self.angle >= 360:
+                self.angle -= 360
+            angle = math.radians(self.angle)
+            self.rect.x = player.rect.centerx + self.radius * math.cos(angle)
+            self.rect.y = player.rect.centery + self.radius * math.sin(angle)
+            self.radius += 1
+
+        elif self.type == "tracking":
+            if self.target is None:
+                nearest_enemy = None
+                min_distance = float('inf')
+                for enemy in enemy_group:
+                    distance = math.hypot(self.rect.centerx - enemy.rect.centerx, self.rect.centery - enemy.rect.centery)
+                    if distance < min_distance:
+                        nearest_enemy = enemy
+                        min_distance = distance
+
+                if nearest_enemy is not None:
+                    # Calculate the direction to the nearest enemy
+                    delta_x = nearest_enemy.rect.centerx - self.rect.centerx
+                    delta_y = nearest_enemy.rect.centery - self.rect.centery
+                    distance = math.hypot(delta_x, delta_y)
+                    if distance > 0:
+                        self.dir = (delta_x / distance, delta_y / distance)
+
+                self.rect.x = self.rect.x + self.dir[0] * self.projectile_speed
+                self.rect.y = self.rect.y + self.dir[1] * self.projectile_speed
+        else:
+            self.rect.x = self.rect.x + self.dir[0] * self.projectile_speed
+            self.rect.y = self.rect.y + self.dir[1] * self.projectile_speed
+
+        rotation_angle = math.degrees(math.atan2(-self.dir[1], self.dir[0]))
+        self.image = pygame.transform.rotate(self.original_image, rotation_angle)
+            
+    def move2(self, player, enemy_group):
         if self.type == "circling":
             self.angle += self.projectile_speed
             if self.angle >= 360:
@@ -368,8 +410,7 @@ class Bullet(pygame.sprite.Sprite):
             self.rect.x = self.rect.x + self.dir[0] * self.projectile_speed
             self.rect.y = self.rect.y + self.dir[1] * self.projectile_speed
         
-    def collide(self, target):
-        target.damaged(self.damage)
+    def collide(self):
         if self.lifespan is not None:
             self.lifespan -= 1
             if self.lifespan <= 0:
@@ -406,16 +447,16 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft = position)
         self.pickup_circle = self.rect
         self.invincible = False
+        self.state = "normal"
         self.friction = 0.1
         self.max_speed = 2.0
         self.acceleration = 0.2
         self.velocity = pygame.math.Vector2(0, 0)
         self.animating = False
-        self.animation = 0
-        self.frame = 0
+        self.animation_frame = 0
         self.level = 0
         self.lives = 1
-        self.health = 100
+        self.health = 25
         self.health_regen = 0
         self.damage = 1
         self.armor = 1
@@ -444,11 +485,17 @@ class Player(pygame.sprite.Sprite):
             self.velocity.x = min(self.velocity.x + self.acceleration, max_speed)
         else:
             self.velocity.x *= (1 - self.friction)
+        
+        if not current_map.width - self.rect.width // 2 >= self.rect.centerx + self.velocity.x >= self.rect.width // 2:
+            self.velocity.x = 0
+        
+        if not current_map.height - self.rect.height // 2 >= self.rect.centery + self.velocity.y >= self.rect.height // 2:
+            self.velocity.y = 0
             
         self.rect.center += self.velocity
             
     def shoot(self, weapon, level, groups):
-        for i in range(0, weapon[level]["amount"]):
+        for i in range(0, weapon[level]["amount"] + self.modifiers["extra_projectiles"]):
             radius = None
             if weapon["movement"] == "random":
                 distance = (random.uniform(-1, 1), random.uniform(-1, 1))
@@ -473,10 +520,10 @@ class Player(pygame.sprite.Sprite):
             Bullet(position, groups, (direction[0], direction[1]), weapon, level, self.modifiers, radius)
 
     def level_up(self):
-        self.level += 1
         self.exp = 0
-        self.exp_to_level *= self.exp_curve
+        self.level += 1
         set_gamestate("levelup")
+        self.exp_to_level *= self.exp_curve
     
     def collect(self, type, item):
         if type == "coin":
@@ -489,6 +536,11 @@ class Player(pygame.sprite.Sprite):
             self.exp += item["value"] * self.modifiers["exp_mult"]
             if self.exp >= self.exp_to_level:
                 self.level_up()
+                
+        elif type == "magnet":
+            for pickup in current_map.camera_group.pickup_group:
+                if pickup.magnet:
+                    pickup.moving = True
 
     def heal(self, amount):
         full_amount = math.ceil(amount * self.modifiers["heal_mult"])
@@ -498,45 +550,62 @@ class Player(pygame.sprite.Sprite):
         if not self.invincible:
             self.health -= max(damage - (self.armor + self.modifiers["armor"]), 0)
             invincibility_time = 500 * self.modifiers["invincibility_mult"]
+            pygame.time.set_timer(99, invincibility_time, loops=1)
+            self.state = "damaged"
             self.animating = True
-            self.animation = 10
+            self.animation = 19
             self.invincible = True
-            
+
         if self.health <= 0:
             self.lives -= 1
 
         if self.lives == 0:
             self.current_map.failed()
-        
+
     def damageable(self):
         self.invincible = False
 
     def update(self, player, enemy_group):
+        collisions = pygame.sprite.spritecollide(self, enemy_group, False)
+        max_damage = 0
+        for collision in collisions:
+            if collision.damage > max_damage:
+                max_damage = collision.damage
+        if max_damage > 0: 
+            self.damaged(max_damage)
+            
         if self.animating:
-            if self.frame > self.animation:
-                self.frame = 0
+            if self.animation_frame > self.animation:
+                self.state = "normal"
+                self.animation_frame = 0
                 self.animating = False
                 self.image.blit(self.original_image, (0,0))
             else:
-                self.frame += 1
-                fade_factor = 1 - (self.frame/10)
-                red_component = int(self.flash_color.r * fade_factor)
-                flash_color = pygame.Color(red_component, self.flash_color.g, self.flash_color.b, self.flash_color.a)
-                flash_surface = pygame.Surface(self.rect.size, pygame.SRCALPHA)
-                flash_surface.fill(flash_color)
-                self.image.blit(flash_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
-                
-            
+                self.animation_frame += 1
+                if self.state == "damaged":
+                    fade_factor = 1 - (self.animation_frame/20)
+                    red_component = int(255 * fade_factor)
+                    flash_color = pygame.Color(red_component, self.flash_color.g, self.flash_color.b)
+                    flash_surface = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+                    flash_surface.fill(flash_color)
+                    self.image.blit(self.original_image, (0,0))
+                    self.image.blit(flash_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
         self.move()
 
 class CurrentMap():
     def __init__(self, current_map, difficulty):
         self.running = True
+        self.spawn_mult = 1.0
+        self.boss_alive = False
         self.finished_upgrades = []
         self.available_upgrades = list(WEAPONS.keys()) + list(PASSIVES.keys())
-        self.timeout = current_map["timeout"] * 60
+        self.countdown = current_map["timeout"] * 60
         self.enemies = current_map["enemies"]
+        self.minibosses = [current_map["minibosses"]]
         self.bosses = current_map["bosses"]
+        self.waves = current_map["waves"]
+        self.current_wave = 1
         self.ground = current_map["background"]
         self.ground_fill = current_map["bgcolor"]
         self.difficulty = difficulty
@@ -552,12 +621,24 @@ class CurrentMap():
         self.set_powers()
     
     # ------------------------ SPAWNING ------------------------
-    def spawn_enemies(self, enemy, amount):
-        for i in range(0, amount):
-            Enemy(self.random_point_on_circle(self.player.rect.centerx,
-                                              self.player.rect.centery,
-                                              SCREEN_WIDTH // 2),
-                  [self.camera_group, self.camera_group.enemy_group], enemy, self)
+    def spawn_enemies(self, enemy, amount, grouped = False):
+        if grouped:
+            pos = self.random_point_on_circle(self.player.rect.centerx, 
+                                              self.player.rect.centery, 
+                                              SCREEN_WIDTH // 2)
+            player_pos = pygame.Vector2(self.player.rect.centerx, self.player.rect.centery)
+            target = player_pos - (pos - player_pos)
+            for i in range(0, amount):
+                Enemy(pos, [self.camera_group, self.camera_group.enemy_group], enemy, self, target)
+        else:
+            for i in range(0, amount):
+                pos = self.random_point_on_circle(self.player.rect.centerx, 
+                                                self.player.rect.centery, 
+                                                SCREEN_WIDTH // 2)
+                Enemy(pos, [self.camera_group, self.camera_group.enemy_group], enemy, self)
+    
+    def spawn_miniboss(self, miniboss):
+        pass
     
     def spawn_boss(self, boss):
         pass
@@ -596,9 +677,9 @@ class CurrentMap():
             self.player.weapons.append([choice, 0])
         else:
             self.player.passives.append([choice, 0])
-        
+        set_gamestate("gameplay")
+        self.set_powers()        
         self.choices = random.sample(current_map.available_upgrades, 5)
-        self.set_powers()
     
     def set_powers(self):
         i = 0
@@ -612,26 +693,23 @@ class CurrentMap():
 
     def load_map(self):
         self.camera_group = CameraGroup(self.ground)
-        self.player = Player((self.width // 2, self.height // 2), self.camera_group, "standard", self)
+        self.player = Player((self.width // 2, self.height // 2), self.camera_group, "Poison Shot", self)
         self.camera_group.set_player(self.player)
     
     def random_point_on_circle(self, center_x, center_y, radius):
         angle = random.uniform(0, 2 * math.pi)
         x = center_x + radius * math.cos(angle)
         y = center_y + radius * math.sin(angle)
-        return (x, y)
+        return (int(x), int(y))
     
     def draw_text(self, surface, text, font, color, rect, max_width=None):
         words = text.split(' ')
         space_width, _ = font.size(' ')
-
         lines = []
         current_line = []
         current_width = 0
-
         for word in words:
             word_width, word_height = font.size(word)
-
             if max_width and current_width + word_width > max_width:
                 lines.append(' '.join(current_line))
                 current_line = [word]
@@ -641,9 +719,7 @@ class CurrentMap():
                 current_width += word_width + space_width
 
         lines.append(' '.join(current_line))
-
         y = rect.centery - (len(lines) - 1) * word_height // 2
-
         for line in lines:
             text_surface = font.render(line, True, color)
             text_rect = text_surface.get_rect(center=(rect.centerx, y))
@@ -671,19 +747,20 @@ class CurrentMap():
         screen.blit(box_surface, (x, y))
         
     def levelup_ui(self):
-        choices = self.choices
         transparent_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         pygame.draw.rect(transparent_bg, (0, 0, 0, 128), (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
         screen.blit(transparent_bg, (0,0))
         i = 0
-        for choice in choices:
+        for choice in self.choices:
             level = "NEW"
             for weapon in self.player.weapons:
                 if choice == weapon[0]:
                     level = f'Level {weapon[1] + 1}'
+                    break
             for passive in self.player.passives:
                 if choice == passive[0]:
                     level = f'Level {passive[1] + 1}'
+                    break
                     
             if choice in WEAPONS.keys():
                 item = WEAPONS[choice]
@@ -692,7 +769,7 @@ class CurrentMap():
             else:
                 item = EXTRAS[choice]
                 
-            self.display_box(40 + (250 * i), 100, 200, 300, level, item["image"], item["name"], item["description"])
+            self.display_box(40 + (250 * i), 100, 200, 300, level, item["image"], choice, item["description"])
             i += 1
     
     def pause_ui(self):
@@ -702,7 +779,7 @@ class CurrentMap():
 
     def map_ui(self):
         # Title and text
-        countdown = self.title_font.render(f'{max(0, self.timeout // 60)}:{str(self.timeout % 60).zfill(2)}', True, (255, 255, 255))
+        countdown = self.title_font.render(f'{max(0, self.countdown // 60)}:{str(self.countdown % 60).zfill(2)}', True, (255, 255, 255))
         countdown_rect = countdown.get_rect(center=(SCREEN_WIDTH // 2, 20))
         screen.blit(countdown, countdown_rect)
         experience = self.stats_font.render(f'Level: {self.player.level}', True, (255, 255, 255))
@@ -732,23 +809,42 @@ class CurrentMap():
     
     def failed(self):
         pass
-    
-pygame.init()
-event_handler = ...
-drawables = [...]
-game_state = "gameplay"
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),flags=pygame.SCALED, vsync=1)
-current_map = CurrentMap(MAPS["1"], 1)
 
-def set_gamestate(action):
+def wave_spawn():
+    minutes = math.ceil(current_map.countdown/60)
+    wave = current_map.waves[current_map.current_wave]
+    grouped = False
+    if not current_map.boss_alive:
+        current_map.countdown -= 1
+        if current_map.countdown == 0:
+            current_map.spawn_boss(current_map.bosses[0])
+        
+        if current_map.countdown % 30 == 0:
+            wave = current_map.waves[5]
+            grouped = True
+        
+        if minutes % 3 == 0:
+            current_map.current_wave += 1
+            current_map.spawn_miniboss(current_map.minibosses[0])
+            
+    print("Enemies:", len(current_map.camera_group.enemy_group)) ## to test for lagging, remember to check here
+    if len(current_map.camera_group.enemy_group) <= 1000:
+        i = 0
+        for enemy in current_map.enemies:
+            if wave[i] != (0,0):
+                current_map.spawn_enemies(enemy, int(random.randrange(wave[i][0], wave[i][1]) * current_map.spawn_mult), grouped)
+            i += 1
+
+def detect_collisions():
+    collisions = pygame.sprite.groupcollide(current_map.camera_group.enemy_group, current_map.camera_group.projectile_group, False, False)
+    for enemy, projectiles in collisions.items():
+        for projectile in projectiles:
+            projectile.collide()
+            enemy.damaged(projectile.damage)
+
+def set_gamestate(state):
     global game_state
-    if action == "toggle":
-        if game_state == "paused":
-            game_state = "gameplay"
-        else:
-            game_state = "paused"
-    else:
-        game_state = action
+    game_state = state
     
 async def game_loop(framerate_limit=math.inf):
     loop = asyncio.get_event_loop()
@@ -767,6 +863,7 @@ async def game_loop(framerate_limit=math.inf):
             screen.fill(current_map.ground_fill)
             current_map.camera_group.custom_draw(current_map.player)
             if game_state == "gameplay":
+                detect_collisions()
                 current_map.camera_group.update(current_map.player, current_map.camera_group.enemy_group)
             
             current_map.map_ui()
@@ -774,63 +871,77 @@ async def game_loop(framerate_limit=math.inf):
                 current_map.pause_ui()
                 if game_state == "levelup":
                     current_map.levelup_ui()
-                
+
         events_to_handle = list(pygame.event.get())
         events_handled = loop.create_task(handle_events(events_to_handle))
         await loop.run_in_executor(None, pygame.display.update)
         await events_handled
 
 async def handle_events(events_to_handle):
-    box1_rect = pygame.Rect(40, 100, 200, 300)
-    box2_rect = pygame.Rect(290, 100, 200, 300)
-    box3_rect = pygame.Rect(540, 100, 200, 300)
-    box4_rect = pygame.Rect(790, 100, 200, 300)
-    box5_rect = pygame.Rect(1040, 100, 200, 300)
+    if game_state == "levelup":
+        box1_rect = pygame.Rect(40, 100, 200, 300)
+        box2_rect = pygame.Rect(290, 100, 200, 300)
+        box3_rect = pygame.Rect(540, 100, 200, 300)
+        box4_rect = pygame.Rect(790, 100, 200, 300)
+        box5_rect = pygame.Rect(1040, 100, 200, 300)
+
     for event in events_to_handle:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
         if current_map is not None:
-            if event.type == pygame.USEREVENT:
-                current_map.timeout -= 1
-                if len(current_map.camera_group.enemy_group) <= 1:
-                    current_map.spawn_enemies(current_map.enemies[0], random.randrange(1, 5))
+            if game_state == "gameplay":
+                if event.type == pygame.USEREVENT:
+                    wave_spawn()
 
-            if event.type == 98:
-                current_map.player.heal(current_map.player.modifiers["health_regen"])
+                if event.type == 98:
+                    current_map.player.heal(current_map.player.modifiers["health_regen"])
 
-            if event.type == 99:
-                current_map.player.damageable()
+                if event.type == 99:
+                    current_map.player.damageable()
+                    
+                if event.type in range(100, 100 + len(WEAPONS)):
+                    if WEAPONS[current_map.player.weapons[event.type - 100][0]]["type"] == "bullet":
+                        current_map.player.shoot(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
+                                                current_map.player.weapons[event.type - 100][1], 
+                                                [current_map.camera_group, current_map.camera_group.projectile_group])
+                        
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_0:
+                        set_gamestate("paused")
+
+                    if event.key == pygame.K_1:
+                        current_map.spawn_mult += 1
                 
-            if event.type in range(100, 100 + len(WEAPONS) - 1):
-                if WEAPONS[current_map.player.weapons[event.type - 100][0]]["type"] == "bullet":
-                    current_map.player.shoot(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
-                                             current_map.player.weapons[event.type - 100][1], 
-                                             [current_map.camera_group, current_map.camera_group.projectile_group])
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_0:
-                    set_gamestate("toggle")
-
-                if event.key == pygame.K_1:
-                    for pickup in current_map.camera_group.pickup_group:
-                        if pickup.magnet:
-                            pickup.moving = True
+                    if event.key == pygame.K_2:
+                        current_map.player.collect("experience", {"value": 5})
+                        
+            elif game_state == "paused":
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_0:
+                        set_gamestate("gameplay")
             
-            if event.type == pygame.MOUSEBUTTONDOWN and game_state == "levelup":
-                mouse_x, mouse_y = pygame.mouse.get_pos()
-                if box1_rect.collidepoint(mouse_x, mouse_y):
-                    current_map.level_up(current_map.choices[0])
-                elif box2_rect.collidepoint(mouse_x, mouse_y):
-                    current_map.level_up(current_map.choices[1]) 
-                elif box3_rect.collidepoint(mouse_x, mouse_y):
-                    current_map.level_up(current_map.choices[2])
-                elif box4_rect.collidepoint(mouse_x, mouse_y):
-                    current_map.level_up(current_map.choices[3])
-                elif box5_rect.collidepoint(mouse_x, mouse_y):
-                    current_map.level_up(current_map.choices[4])
-                else:
-                    continue
+            elif game_state == "levelup":
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    if box1_rect.collidepoint(mouse_x, mouse_y):
+                        current_map.level_up(current_map.choices[0])
+                    elif box2_rect.collidepoint(mouse_x, mouse_y):
+                        current_map.level_up(current_map.choices[1]) 
+                    elif box3_rect.collidepoint(mouse_x, mouse_y):
+                        current_map.level_up(current_map.choices[2])
+                    elif box4_rect.collidepoint(mouse_x, mouse_y):
+                        current_map.level_up(current_map.choices[3])
+                    elif box5_rect.collidepoint(mouse_x, mouse_y):
+                        current_map.level_up(current_map.choices[4])
+                    else:
+                        continue
 
-asyncio.run(game_loop(120))
+if __name__ == "__main__":
+    pygame.init()
+    event_handler = ...
+    game_state = "gameplay"
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),flags=pygame.SCALED, vsync=1)
+    current_map = CurrentMap(MAPS["1"], 1)
+    asyncio.run(game_loop(120))
