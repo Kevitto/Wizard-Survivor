@@ -10,15 +10,19 @@ pygame
 
 ## Updates
 
-> Offloaded collision detection 
-> Added passives and a passive system
-> Added names to weapons and passives
-> Added weapon sprites
-> Added dynamic text box sizing in level up screen
-> Added modifier dictionary to player object
-> Changed Bullet class to apply player modifiers
-> Added new placeholder images to all passives and weapons
-> Added background image to upgrade box surface
+> Offloaded collision detection\
+> Added passives and a passive system\
+> Added names to weapons and passives\
+> Added weapon sprites\
+> Added dynamic text box sizing in level up screen\
+> Added modifier dictionary to player object\
+> Changed Bullet class to apply player modifiers\
+> Added new placeholder images to all passives and weapons\
+> Added background image to upgrade box surface\
+> Created sprite loader\
+> Added frame counters and animations\
+> Added Orb class\
+> 
 
 ## Roadmap
 
@@ -40,13 +44,14 @@ Better movement\
 Better pickup management\
 More modifiers\
 Async engine\
+Basic animations\
+Rewrote collision detection\
 
 ### To Do
 
 Title screen\
 Level selector\
 More enemies\
-Basic animations\
 Level progression (pass/fail)\
 More weapons\
 More passives\
@@ -57,4 +62,3 @@ Multiple characters\
 Splash screen\
 Custom art\
 Better UI\
-Rewrite collision detection using groupecollides and spritecollides
