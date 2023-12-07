@@ -22,6 +22,13 @@ pygame
 > Created sprite loader\
 > Added frame counters and animations\
 > Added Orb class\
+> Added more passives\
+> Reworked powers acquisition\
+> Added Title screen\
+> Added level pass/fail flags\
+> Added boss/miniboss counters and timer\
+> Implemented quadtree collision detection for enemies\
+> Created load/save methods\
 > 
 
 ## Roadmap
@@ -45,20 +52,19 @@ Better pickup management\
 More modifiers\
 Async engine\
 Basic animations\
-Rewrote collision detection\
+Rewrite collision detection\
+Title screen\
+Level progression (pass/fail)\
+Local saves\
 
 ### To Do
 
-Title screen\
 Level selector\
 More enemies\
-Level progression (pass/fail)\
 More weapons\
 More passives\
 Permanent upgrades shop\
-Local saves\
 Difficulty curve + selection\
 Multiple characters\
-Splash screen\
 Custom art\
 Better UI\
