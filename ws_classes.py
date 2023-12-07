@@ -1,6 +1,12 @@
 #!/usr/bin/python3
 from ws_constants import SCREEN_WIDTH, SCREEN_HEIGHT
 import pygame, random, math
+KEY_MAP = {
+    pygame.K_UP: 'up',
+    pygame.K_DOWN: 'down',
+    pygame.K_LEFT: 'left',
+    pygame.K_RIGHT: 'right',
+}
 
 class CameraGroup(pygame.sprite.Group):
     def __init__(self, background, current_map):
@@ -8,20 +14,18 @@ class CameraGroup(pygame.sprite.Group):
         self.enemy_group = pygame.sprite.Group()
         self.projectile_group = pygame.sprite.Group()
         self.orb_group = pygame.sprite.Group()
+        self.aura_group = pygame.sprite.Group()
         self.pickup_group = pygame.sprite.Group()
         self.display_surf = pygame.display.get_surface()
         self.offset = pygame.math.Vector2()
         self.half_w = self.display_surf.get_size()[0] // 2
         self.half_h = self.display_surf.get_size()[1] // 2
         self.ground_surf = pygame.image.load(background).convert_alpha()
-        self.ground_rects = []
         ground_width = self.ground_surf.get_width()
         ground_height = self.ground_surf.get_height()
-        tile_x = current_map.width // self.ground_surf.get_width()
-        tile_y = current_map.height // self.ground_surf.get_height()
-        for i in range(0, tile_x):
-            for j in range(0, tile_y):
-                self.ground_rects.append(pygame.Rect(i * ground_width, j * ground_height, self.ground_surf.get_width(), self.ground_surf.get_height()))
+        tile_x = current_map.width // ground_width
+        tile_y = current_map.height // ground_height
+        self.ground_rects = [pygame.Rect(i * ground_width, j * ground_height, ground_width, ground_height) for i in range(tile_x) for j in range(tile_y)]
         self.ground_rect = self.ground_surf.get_rect(topleft = (0,0))
 
     def set_player(self, player):
@@ -35,23 +39,28 @@ class CameraGroup(pygame.sprite.Group):
     def custom_draw(self, target):
         self.offset.x = target.rect.centerx - self.half_w
         self.offset.y = target.rect.centery - self.half_h
-        i = 0
+        surf_rect = self.display_surf.get_rect()
+        surf_rect.centerx += self.offset.x
+        surf_rect.centery += self.offset.y
         for ground_rect in self.ground_rects:
-            surf_rect = self.display_surf.get_rect()
-            surf_rect.centerx += self.offset.x
-            surf_rect.centery += self.offset.y
             if pygame.Rect.colliderect(surf_rect, ground_rect):
-                i += 1
                 self.display_surf.blit(self.ground_surf, ground_rect.topleft - self.offset)
-        
-        for sprite in self.pickup_group.sprites():
-            self.display_surf.blit(sprite.image, sprite.rect.center - self.offset) # Pickups
 
-        for sprite in sorted(self.enemy_group.sprites(), key = lambda sprite: sprite.rect.centery):
-            self.display_surf.blit(sprite.image, sprite.rect.center - self.offset) # Enemies
+        aura_sprites = self.aura_group.sprites()
+        pickup_sprites = self.pickup_group.sprites()
+        enemy_sprites = sorted(self.enemy_group.sprites(), key = lambda sprite: sprite.rect.centery)
+        projectile_sprites = [sprite for sprite in self.projectile_group.sprites() if sprite not in aura_sprites]
+        for sprite in aura_sprites:
+            self.display_surf.blit(sprite.image, sprite.rect.topleft - self.offset) # Auras
 
-        for sprite in self.projectile_group.sprites():
-            self.display_surf.blit(sprite.image, sprite.rect.center - self.offset) # Projectiles
+        for sprite in pickup_sprites:
+            self.display_surf.blit(sprite.image, sprite.rect.topleft - self.offset) # Pickups
+
+        for sprite in enemy_sprites:
+            self.display_surf.blit(sprite.image, sprite.rect.topleft - self.offset) # Enemies
+
+        for sprite in projectile_sprites:
+            self.display_surf.blit(sprite.image, sprite.rect.topleft - self.offset) # Projectiles
 
         self.display_surf.blit(self.player.image, self.player.rect.topleft - self.offset) # Player
 
@@ -59,31 +68,25 @@ class Pickup(pygame.sprite.Sprite):
     def __init__(self, position, groups, type, item, moving):
         super().__init__(groups)
         self.image = pygame.image.load(item["image"]).convert_alpha()
-        self.rect = self.image.get_rect(center = position)
+        self.rect = self.image.get_rect(center=position)
         self.type = type
-        self.speed = 1
         self.item = item
+        self.acceleration = 0
         self.magnet = item["magnet"]
         self.moving = moving
-        
+
     def update(self, player, enemy_group):
         if self.moving:
             self.move(player)
         self.check_collision(player)
-    
-    def move(self, player):
-        delta_x = player.rect.centerx - self.rect.centerx
-        delta_y = player.rect.centery - self.rect.centery
-        distance = math.hypot(delta_x, delta_y)
-        if distance > 0:
-            self.dir = (delta_x / distance, delta_y / distance)
 
-        self.speed *= 1.02
-        new_x = self.rect.x + self.dir[0] * self.speed
-        new_y = self.rect.y + self.dir[1] * self.speed
-        self.rect.x = new_x
-        self.rect.y = new_y
-    
+    def move(self, player):
+        delta = pygame.Vector2(player.rect.center) - pygame.Vector2(self.rect.center)
+        if delta.length() > 0:
+            self.acceleration += 0.1
+            self.speed = delta.normalize() * self.acceleration
+            self.rect.center += self.speed
+
     def check_collision(self, player):
         if pygame.sprite.collide_rect(self, player):
             player.collect(self.type, self.item)
@@ -96,7 +99,9 @@ class Enemy(pygame.sprite.Sprite):
         self.acceleration = 0.1
         self.friction = 0.05
         self.target = target
+        self.distance_to_player = 0
         self.auto_destroy = False if target is None else True
+        self.position = pygame.math.Vector2(position)
         self.dir = pygame.Vector2(0,0)
         self.velocity = pygame.math.Vector2(0, 0)
         self.max_speed = template["speed"]
@@ -123,74 +128,21 @@ class Enemy(pygame.sprite.Sprite):
     
     def move(self, player, enemy_group):
         target = self.target if self.target is not None else player.rect.center
-        target_dir = pygame.math.Vector2(target[0] - self.rect.centerx,
-                                            target[1] - self.rect.centery)
-        delta_x = target[0] - self.rect.centerx
-        delta_y = target[1] - self.rect.centery
-        distance = math.hypot(delta_x, delta_y)
+        target_dir = pygame.math.Vector2(target) - self.position
+        distance = target_dir.length()
         if distance > 0:
-            self.dir = pygame.Vector2(delta_x / distance, delta_y / distance)
+            self.dir = target_dir.normalize()
             
         if distance < 5 and self.auto_destroy:
             self.kill()
             
-        if target_dir != (0,0):
-            target_dir = target_dir.normalize()
-
-        angle_between = self.dir.angle_to(target_dir)
-        max_rotation = min(3, abs(angle_between))
-        self.dir.rotate_ip(max_rotation if angle_between > 0 else -max_rotation)
-        new_x = self.rect.x + self.dir[0] * self.max_speed
-        new_y = self.rect.y + self.dir[1] * self.max_speed
-        if self.dir != (0, 0):
-            self.velocity += pygame.math.Vector2(self.dir[0] * self.max_speed, self.dir[1] * self.max_speed) * self.acceleration
-        else:
-            friction_force = -self.velocity * self.friction
-            self.velocity += friction_force
-
-        if self.velocity.length() > self.max_speed:
-            self.velocity.scale_to_length(self.max_speed)
-            
-        self.rect.x = new_x
-        self.rect.y = new_y
-                    
-    def move2(self, player, enemy_group):
-        target = self.target if self.target is not None else player.rect.center
-        delta_x = target[0] - self.rect.centerx
-        delta_y = target[1] - self.rect.centery
-        distance = math.hypot(delta_x, delta_y)
-        if distance > 0:
-            self.dir = (delta_x / distance, delta_y / distance)
-        if distance < 5 and self.auto_destroy:
-            self.kill()
-
-        new_x = self.rect.x + self.dir[0] * self.max_speed
-        new_y = self.rect.y + self.dir[1] * self.max_speed
-        if self.dir != (0, 0):
-            self.velocity += pygame.math.Vector2(self.dir[0] * self.max_speed, self.dir[1] * self.max_speed) * self.acceleration
-        else:
-            friction_force = -self.velocity * self.friction
-            self.velocity += friction_force
-
-        if self.velocity.length() > self.max_speed:
-            self.velocity.scale_to_length(self.max_speed)
-
-        """collision_rect = self.rect.inflate(-self.rect.width // 2, -self.rect.height // 2)
-        collision_rect.topleft = (new_x + self.rect.width // 4, new_y + self.rect.height // 4)
-        for enemy in enemy_group:
-            if enemy != self and collision_rect.colliderect(enemy.rect):
-                delta_x = self.rect.centerx - enemy.rect.centerx
-                delta_y = self.rect.centery - enemy.rect.centery
-                distance = math.hypot(delta_x, delta_y)
-                if distance > 0:
-                    away_dir = (delta_x / distance, delta_y / distance)
-                    new_x += away_dir[0] * 2
-                    new_y += away_dir[1] * 2"""
-
-        self.rect.x = new_x
-        self.rect.y = new_y
+        self.velocity = self.dir * self.max_speed
+        self.position += self.velocity
+        self.rect.center = round(self.position.x), round(self.position.y)
         
-    def damaged(self, damage):
+    def damaged(self, damage, projectile = None):
+        if projectile is not None:
+            projectile.collide()
         self.flash_end_time = pygame.time.get_ticks() + self.flash_duration
         self.is_damaged = True
         self.health -= damage
@@ -205,7 +157,7 @@ class Boss(Enemy):
         self.image = pygame.transform.scale2x(pygame.image.load(template["image"]).convert_alpha())
         self.rect = self.image.get_rect(center = position)
         
-    def damaged(self, damage):
+    def damaged(self, damage, projectile = None):
         self.flash_end_time = pygame.time.get_ticks() + self.flash_duration
         self.is_damaged = True
         self.health -= damage
@@ -227,10 +179,12 @@ class Projectile(pygame.sprite.Sprite):
         self.type = weapon["movement"]
         self.dir = pygame.Vector2(direction[0], direction[1])
         self.radius = radius
+        self.circle_hitbox = pygame.draw.circle(self.image, (255, 0, 0), self.rect.center, self.rect.width // 2, 1)
         self.area = 4
         self.level = level + 1
         self.exploding = False
         self.explosive = modifiers["explosive"]
+        self.explosion_image = pygame.image.load("graphics/explosion.png").convert_alpha()
         self.explosion_radius = modifiers["explosion_radius"] + modifiers["power_radius"]
         self.projectile_speed = (weapon[level]["speed"] + random.choice([-1, 0, 1])) * modifiers["projectile_speed_mult"]  if self.type == "random" else weapon[level]["speed"] * modifiers["projectile_speed_mult"] 
         self.damage = (weapon[level]["damage"] + modifiers["damage"]) * modifiers["damage_mult"]
@@ -245,8 +199,7 @@ class Projectile(pygame.sprite.Sprite):
                 self.kill()
             else:
                 self.animation_frame += 1
-                self.original_image = pygame.transform.scale(pygame.image.load("graphics/explosion.png").convert_alpha(), (self.explosion_radius, self.explosion_radius))
-                self.image = self.original_image
+                self.image = pygame.transform.scale(self.explosion_image, (self.explosion_radius, self.explosion_radius))
                 self.rect = self.image.get_rect(center=self.rect.center)
         else:
             self.move(enemy_group)
@@ -254,6 +207,7 @@ class Projectile(pygame.sprite.Sprite):
                 self.kill()
 
     def move(self, enemy_group):
+        old_dir = self.dir.copy()
         if self.type == "tracking":
             if self.target is None:
                 nearest_enemy = None
@@ -291,8 +245,11 @@ class Projectile(pygame.sprite.Sprite):
             self.rect.x = self.rect.x + self.dir[0] * self.projectile_speed
             self.rect.y = self.rect.y + self.dir[1] * self.projectile_speed
 
-        rotation_angle = math.degrees(math.atan2(-self.dir[1], self.dir[0]))
-        self.image = pygame.transform.rotate(self.original_image, rotation_angle)
+        if self.dir != old_dir:
+            rotation_angle = math.degrees(math.atan2(-self.dir[1], self.dir[0]))
+            self.image = pygame.transform.rotate(self.original_image, rotation_angle)
+
+        self.circle_hitbox.center = self.rect.center
     
     def dying(self):
         if self.explosive:
@@ -310,14 +267,47 @@ class Orb(Projectile):
     def __init__(self, position, groups, direction, weapon, level, modifiers, radius, angle):
         super().__init__(position, groups, direction, weapon, level, modifiers, radius)
         self.angle = angle
+        self.radius_factor = self.radius * (1 + self.level / 10)
 
     def update(self, player, enemy_group):
         self.move(player)
     
     def move(self, player):
-        self.rect.x = player.rect.centerx + (self.radius * (1 + self.level/10)) * math.cos(self.angle)
-        self.rect.y = player.rect.centery + (self.radius * (1 + self.level/10)) * math.sin(self.angle)
+        direction = pygame.Vector2(math.cos(self.angle), math.sin(self.angle))
+        self.rect.center = player.rect.center + direction * self.radius_factor
+        self.circle_hitbox.center = self.rect.center
         self.angle -= self.projectile_speed / 30
+
+    def collide(self):
+        pass
+
+class Aura(pygame.sprite.Sprite):
+    def __init__(self, position, groups, aura, level, modifiers, radius):
+        super().__init__(groups)
+        self.image = pygame.image.load(aura["sprite"]).convert_alpha()
+        self.image = pygame.transform.scale(self.image, (radius * 2, radius * 2))
+        self.rotated_images = [pygame.transform.rotate(self.image, angle) for angle in range(360)]
+        self.current_angle = 0
+        self.rect = self.image.get_rect(center=position)
+        self.radius = self.rect.width // 2 * 0.85
+        self.circle_hitbox = pygame.draw.circle(self.image, (255, 0, 0), self.rect.center, self.radius, 1)
+        self.damage = (aura[level]["damage"] + modifiers["damage"]) * modifiers["damage_mult"]
+        self.frame = 0
+        self.animation_speed = 2
+        self.animation = 360
+    
+    def update(self, player, enemy_group):
+        self.frame += 1
+        if self.frame % self.animation_speed == 0:
+            if self.frame / self.animation_speed > self.animation - 1:
+                self.frame = 0
+        self.move(player)
+    
+    def move(self, player):
+        self.image = self.rotated_images[self.current_angle]
+        self.rect = self.image.get_rect(center=player.rect.center)
+        self.current_angle = (self.current_angle + 1) % 360
+        self.circle_hitbox.center = self.rect.center
 
     def collide(self):
         pass
@@ -383,21 +373,15 @@ class Player(pygame.sprite.Sprite):
     def move(self):
         max_speed = self.max_speed * self.modifiers["speed_mult"]
         keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP] and not keys[pygame.K_DOWN]:
-            self.velocity.y = max(self.velocity.y - self.acceleration, -max_speed)
-        elif keys[pygame.K_DOWN] and not keys[pygame.K_UP]:
-            self.velocity.y = min(self.velocity.y + self.acceleration, max_speed)
-        else:
-            self.velocity.y *= (1 - self.friction)
-
-        if keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
-            self.direction = "left"
-            self.velocity.x = max(self.velocity.x - self.acceleration, -max_speed)
-        elif keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT]:
-            self.direction = "right"
-            self.velocity.x = min(self.velocity.x + self.acceleration, max_speed)
-        else:
-            self.velocity.x *= (1 - self.friction)
+        direction_map = {'up': 1, 'down': 1, 'left': 0, 'right': 0}
+        for key, direction in KEY_MAP.items():
+            if keys[key]:
+                if direction in ['up', 'left']:
+                    self.velocity[direction_map[direction]] = max(self.velocity[direction_map[direction]] - self.acceleration, -max_speed)
+                else:
+                    self.velocity[direction_map[direction]] = min(self.velocity[direction_map[direction]] + self.acceleration, max_speed)
+            else:
+                self.velocity[direction_map[direction]] *= (1 - self.friction)
         
         if not self.current_map.width - self.rect.width // 2 >= self.rect.centerx + self.velocity.x >= self.rect.width // 2:
             self.velocity.x = 0
@@ -408,37 +392,31 @@ class Player(pygame.sprite.Sprite):
         self.rect.center += self.velocity
             
     def cast_projectile(self, weapon, level, groups):
-        distance = position = (0,0)
         for i in range(0, weapon[level]["amount"] + self.modifiers["extra_projectiles"]):
-            if weapon["movement"] == "random":
-                distance = (random.uniform(-1, 1), random.uniform(-1, 1))
-                position = (self.rect.x + self.rect.width / 2, self.rect.y + self.rect.height / 2)
-                
-            elif weapon["movement"] == "facing":
+            distance = (random.uniform(-1, 1), random.uniform(-1, 1))
+            if weapon["movement"] == "facing":
                 mouse_pos = pygame.mouse.get_pos()
                 distance = (mouse_pos[0] - SCREEN_WIDTH // 2, mouse_pos[1] - SCREEN_HEIGHT // 2)
-                position = (self.rect.x + self.rect.width / 2, self.rect.y + self.rect.height / 2)
-            
-            elif weapon["movement"] == "tracking":
-                distance = (random.uniform(-1, 1), random.uniform(-1, 1))
-                position = (self.rect.x + self.rect.width / 2, self.rect.y + self.rect.height / 2)
-            
+            position = (self.rect.x + self.rect.width / 2, self.rect.y + self.rect.height / 2)
             normal = math.sqrt(distance[0] ** 2 + distance[1] ** 2)
             direction = [distance[0] / normal, distance[1] / normal]
             Projectile(position, groups, (direction[0], direction[1]), weapon, level, self.modifiers, self.modifiers["power_radius"] * self.modifiers["radius_mult"])
 
-    def cast_orb(self, weapon, level, groups):
+    def cast_orb(self, orb, level, groups):
         radius = self.modifiers["power_radius"] * 2 * self.modifiers["radius_mult"]
-        num_points = weapon[level]["amount"] + self.modifiers["extra_projectiles"]
+        num_points = orb[level]["amount"] + self.modifiers["extra_projectiles"]
         for i in range(num_points):
-            if weapon["movement"] == "circling":
+            if orb["movement"] == "circling":
                 angle = i * (2 * math.pi) / num_points
                 x = self.rect.centerx + radius * math.cos(angle)
                 y = self.rect.centery + radius * math.sin(angle)
                 normal = math.sqrt(x ** 2 + y ** 2)
                 direction = [x / normal, y / normal]
-                Orb((0, 0), groups, (direction[0], direction[1]), weapon, level, self.modifiers, radius, angle)
+                Orb((0, 0), groups, (direction[0], direction[1]), orb, level, self.modifiers, radius, angle)
     
+    def cast_aura(self, aura, level, group):
+        Aura(self.rect.center, group, aura, level, self.modifiers, (self.modifiers["power_radius"] + aura[level]["radius"]) * self.modifiers["radius_mult"])
+        
     def level_up(self):
         self.exp = 0
         self.level += 1
@@ -462,14 +440,13 @@ class Player(pygame.sprite.Sprite):
                 if pickup.magnet:
                     pickup.moving = True
         
-        elif type == "chest": # Don't forget to add a visible pickup of choices when getting the chest
+        elif type == "chest":
             upgrades = []
             amount = random.choices([1,3,5], weights=[50,30,20])[0]
-            print(f'Amount: {amount}')
             for i in range(amount):
-                choice = random.choice(self.current_map.available_upgrades)
-                upgrades.append(choice)
+                choice = random.choice(self.current_map.generate_choices())
                 self.current_map.level_up(choice)
+                upgrades.append(choice)
 
     def heal(self, amount):
         full_amount = math.ceil(amount * self.modifiers["heal_mult"])

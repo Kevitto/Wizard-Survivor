@@ -1,7 +1,105 @@
 #!/usr/bin/python3
 from ws_constants import SCREEN_WIDTH, SCREEN_HEIGHT, EXTRAS, WEAPONS, PASSIVES, PICKUPS, MAPS, CHARACTERS
-from ws_classes import Pickup, Enemy, Boss, Player, CameraGroup
-import pygame, sys, time, asyncio, random, math
+from ws_classes import Enemy, Boss, Player, CameraGroup
+from pyqtree import Index
+import pygame, sys, asyncio, random, math, os, pickle
+
+class Game():
+    LAYER_IMAGES = ["graphics/abg_layer{}.png".format(i) for i in range(1, 7)]
+    def __init__(self):
+        self.game_save = "game.save"
+        self.name = "Wizard Survivor"
+        self.version = "0.0.1"
+        self.game_state = "titlescreen"
+        self.load()
+        self.title_font = pygame.font.Font(None, 48)
+        self.text_font = pygame.font.Font(None, 24)
+        self.bg_layers = [pygame.image.load(image).convert_alpha() for image in self.LAYER_IMAGES]
+        self.bg_layers[3].fill((255, 255, 255, int(255 * 0.6)), None, pygame.BLEND_RGBA_MULT)
+        self.bg_layer5_x = 0
+        self.title_image = pygame.image.load("graphics/title.png").convert_alpha()
+        self.frame = 0
+        self.animation_speed = 2
+        self.text_up = True
+        self.text_y = 0
+        self.title_y = 50
+
+    def save(self):
+        print('saved...?')
+        pickle.dump(self.game_data, open(self.game_save, 'wb'))
+
+    def load(self):
+        try:
+            print('loaded game')
+            self.game_data = pickle.load(open(self.game_save, 'rb'))
+        except FileNotFoundError:
+            print('loaded garbage')
+            self.game_data = {"game_difficulty": 1,
+                "game_character": "Wizard Bob",
+                "game_map": "1",
+                "game_talents": 0,
+                "game_money": 0,
+                "game_level": 0,
+                "game_exp": 0,
+                "permanent_modifiers": {"health_mult": 1,
+                                        "health_regen": 0,
+                                        "armor": 0,
+                                        "damage": 0,
+                                        "damage_mult": 1,
+                                        "speed_mult": 1,
+                                        "extra_projectiles": 0,
+                                        },}
+
+    def animated_bg(self):
+        for i, layer in enumerate(self.bg_layers):
+            if i == 3:
+                temp_image = layer.copy()
+                screen.blit(temp_image, (self.bg_layer5_x, 0))
+                screen.blit(temp_image, (self.bg_layer5_x - temp_image.get_width(), 0))
+                self.bg_layer5_x += 1
+                if self.bg_layer5_x >= temp_image.get_width():
+                    self.bg_layer5_x = 0
+            else:
+                screen.blit(layer, (0, 0))
+        
+    def title_screen_ui(self): # Title Screen UI
+        self.frame += 1
+        if self.frame / self.animation_speed < 50:
+            if self.frame % self.animation_speed == 0:
+                self.title_y -= 1
+                self.animated_bg()
+                temp_image = self.title_image.copy()
+                temp_image.fill((255, 255, 255, int(self.frame / self.animation_speed * 5)), None, pygame.BLEND_RGBA_MULT)
+                screen.blit(temp_image, (SCREEN_WIDTH // 2 - temp_image.get_width() // 2, 50 + self.title_y))
+        else:
+            if self.frame % self.animation_speed == 0:
+                self.animated_bg()
+            screen.blit(self.title_image, (SCREEN_WIDTH // 2 - self.title_image.get_width() // 2, 50 + self.title_y))
+            if self.text_up == True:
+                self.text_y += 0.25
+            else:
+                self.text_y -= 0.25
+                
+            if self.text_y == 5:
+                self.text_up = False
+            elif self.text_y == 0:
+                self.text_up = True
+                
+            text = self.text_font.render("Press any key to start", True, (255, 255, 255))
+            text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 200 + self.text_y))
+            screen.blit(text, text_rect)
+        
+    def character_select_ui(self):
+        pass
+    
+    def map_select_ui(self):
+        pass
+    
+    def store_ui(self):
+        pass
+    
+    def talent_ui(self):
+        pass
 
 class CurrentMap():
     def __init__(self, current_map, difficulty):
@@ -12,7 +110,6 @@ class CurrentMap():
         self.money_lost_percentage = .5
         self.available_weapons = list(WEAPONS.keys())
         self.available_passives = list(PASSIVES.keys())
-        self.available_upgrades = self.available_weapons + self.available_passives
         self.countdown = current_map["timeout"] * 60
         self.time = self.countdown
         self.enemies = current_map["enemies"]
@@ -28,36 +125,40 @@ class CurrentMap():
         self.exp_wave_offset = 0
         self.bar_width = 100
         self.bar_height = 10
+        self.distance = math.hypot(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         self.title_font = pygame.font.Font(None, 48)
         self.stats_font = pygame.font.Font(None, 16)
         self.victory = False
         pygame.time.set_timer(pygame.USEREVENT, 1000)
-        self.choices = random.sample(self.available_upgrades, 5)
+        self.choices = self.generate_choices()
         self.load_map()
         self.set_powers()
     
     # ------------------------ SPAWNING ------------------------
     def spawn_enemies(self, enemy, amount, grouped = False):
         if grouped:
-            pos = self.random_point_on_circle(self.player.rect.centerx, 
+            group_pos = self.random_point_on_circle(self.player.rect.centerx, 
                                               self.player.rect.centery, 
-                                              SCREEN_WIDTH // 2)
+                                              self.distance + random.randrange(-100, 100))
             player_pos = pygame.Vector2(self.player.rect.centerx, self.player.rect.centery)
-            target = (player_pos - (pos - player_pos))
-            for i in range(0, amount):
+            target = (player_pos - (group_pos - player_pos))
+            for i in range(min(10, amount)):
+                pos = self.random_point_on_circle(group_pos[0], 
+                                              group_pos[1], 
+                                              75)
                 Enemy(pos, [self.camera_group, self.camera_group.enemy_group], enemy, self, target)
         else:
-            for i in range(0, amount):
+            for i in range(amount):
                 pos = self.random_point_on_circle(self.player.rect.centerx, 
                                                 self.player.rect.centery, 
-                                                SCREEN_WIDTH // 2)
+                                                self.distance + random.randrange(-100, 100))
                 Enemy(pos, [self.camera_group, self.camera_group.enemy_group], enemy, self)
     
     def spawn_boss(self, boss, is_boss):
         self.boss_alive = True
         pos = self.random_point_on_circle(self.player.rect.centerx,
                                         self.player.rect.centery,
-                                        SCREEN_WIDTH // 2)
+                                        self.distance)
         Boss(pos, [self.camera_group, self.camera_group.enemy_group], boss, self, is_boss)
         
     def spawn_pickup(self, pos, choice = None):
@@ -73,15 +174,32 @@ class CurrentMap():
             if distance < self.player.modifiers["pickup_radius"]:
                 magnetize = True
             
-            Pickup(pos, [self.camera_group, self.camera_group.pickup_group], random_pickup, PICKUPS[random_pickup], magnetize)
+            #Pickup(pos, [self.camera_group, self.camera_group.pickup_group], random_pickup, PICKUPS[random_pickup], magnetize)
 
     # ------------------------ MISC ------------------------
+    def generate_choices(self):
+        distribution_list = ((1,4), (2,3), (3,2), (4,1))
+        distribution = random.choice(distribution_list)
+        num_weapons = len(self.available_weapons)
+        num_passives = len(self.available_passives)
+
+        try:
+            weapons = random.sample(self.available_weapons, distribution[0])
+            passives = random.sample(self.available_passives, distribution[1])
+            choices = random.sample(weapons + passives, 5)
+        except ValueError:
+            choices = random.sample(self.available_weapons + self.available_passives,
+                                    min(5, num_weapons + num_passives))
+
+        choices += ["200 Coins"] * (5 - len(choices))
+        return choices
+    
     def set_gamestate(self, state):
         set_gamestate(state)
 
     def level_up(self, choice):
         not_found = True
-        if choice in EXTRAS.keys():
+        if choice in EXTRAS:
             not_found = False
             self.player.money += 200
             
@@ -96,34 +214,35 @@ class CurrentMap():
                 break
         
         if not_found:
-            if choice in WEAPONS.keys():
+            weapon_names = [power[0] for power in self.player.weapons]
+            passive_names = [power[0] for power in self.player.passives]
+            if choice in WEAPONS:
                 self.player.weapons.append([choice, 0])
                 if len(self.player.weapons) == 5:
-                    self.available_weapons = [key for key in self.available_weapons if key in [power[0] for power in self.player.weapons]]
-            elif choice in PASSIVES.keys():
+                    self.available_weapons = [key for key in self.available_weapons if key in weapon_names]
+            elif choice in PASSIVES:
                 self.player.passives.append([choice, 0])
                 if len(self.player.passives) == 5:
-                    self.available_passives = [key for key in self.available_passives if key in [power[0] for power in self.player.passives]]
-
-        self.available_upgrades = list(self.available_weapons + self.available_passives)
-        while len(self.available_upgrades) < 5:
-            self.available_upgrades.append("200 Coins")
+                    self.available_passives = [key for key in self.available_passives if key in passive_names]
 
         set_gamestate("gameplay")
         self.set_powers()        
-        self.choices = random.sample(self.available_upgrades, 5)
+        self.choices = self.generate_choices()
     
     def set_powers(self):
-        i = 0
         for orb in self.camera_group.orb_group:
             orb.kill()
-            
-        for weapon in self.player.weapons:
+
+        for aura in self.camera_group.aura_group:
+            aura.kill()
+
+        for i, weapon in enumerate(self.player.weapons):
             pygame.time.set_timer(100 + i, WEAPONS[weapon[0]][weapon[1]]["cooldown"])
-            i += 1
+
         for passive in self.player.passives:
             for key, value in PASSIVES[passive[0]][passive[1]].items():
                 self.player.modifiers[key] = value
+
         pygame.time.set_timer(98, 5000)
 
     def load_map(self):
@@ -138,7 +257,7 @@ class CurrentMap():
         return (int(x), int(y))
     
     def draw_text(self, surface, text, font, color, rect, max_width=None):
-        words = text.split(' ')
+        words = text.split()
         space_width, _ = font.size(' ')
         word_height = 0
         lines = []
@@ -333,7 +452,7 @@ class CurrentMap():
         screen.blit(title_label, title_rect)
         text_label = text_font.render(money, True, (0,0,0))
         text_label_rect = text_label.get_rect(topleft = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + (50)))
-        screen.blit(text_label, text_label_rect) 
+        screen.blit(text_label, text_label_rect)
         button_width, button_height = 150, 50
         menu_button_rect = pygame.Rect((480, 555, button_width, button_height))
         quit_button_rect = pygame.Rect((650, 555, button_width, button_height))
@@ -344,13 +463,14 @@ class CurrentMap():
         resume_label_rect = resume_label.get_rect(center=menu_button_rect.center)
         quit_label_rect = quit_label.get_rect(center=quit_button_rect.center)
         screen.blit(resume_label, resume_label_rect)
-        screen.blit(quit_label, quit_label_rect)   
+        screen.blit(quit_label, quit_label_rect)
 
 def set_gamestate(state):
     global game_state
     game_state = state
     
 def wave_spawn():
+    print(f' projectiles: {len(current_map.camera_group.projectile_group)}\n enemies: {len(current_map.camera_group.enemy_group)}\n pickups: {len(current_map.camera_group.pickup_group)}\n orbs: {len(current_map.camera_group.orb_group)}\n auras: {len(current_map.camera_group.aura_group)}')
     wave = current_map.waves[current_map.current_wave]
     grouped = False
     if not current_map.boss_alive:
@@ -370,41 +490,77 @@ def wave_spawn():
         if current_map.countdown % 60 == 0:
             current_map.spawn_mult += 0.25
             
-    print("Enemies:", len(current_map.camera_group.enemy_group)) ## to test for lagging, remember to check here
-    if len(current_map.camera_group.enemy_group) <= 1000:
-        i = 0
-        for enemy in current_map.enemies:
+    if len(current_map.camera_group.enemy_group) <= 500:
+        for i, enemy in enumerate(current_map.enemies):
             if wave[i] != (0,0):
                 current_map.spawn_enemies(enemy, int(random.randrange(wave[i][0], wave[i][1]) * current_map.spawn_mult), grouped)
-            i += 1
 
-def detect_collisions():
-    collisions = pygame.sprite.groupcollide(current_map.camera_group.enemy_group, current_map.camera_group.projectile_group, False, False)
-    for enemy, projectiles in collisions.items():
+def detect_collisions(): #tracking enemies
+    game_area = (0, 0, current_map.width, current_map.height)
+    enemy_quadtree = Index(bbox=game_area, max_items = 10)
+    for enemy in current_map.camera_group.enemy_group:
+        if not enemy.is_damaged:
+            enemy_quadtree.insert(enemy, enemy.rect)
+    
+    for projectile in current_map.camera_group.projectile_group:
+        nearby_enemies = enemy_quadtree.intersect(projectile.rect)
+        max_damage = 0
+        max_enemy = None
+        for enemy in nearby_enemies:
+            dx = enemy.rect.left - projectile.circle_hitbox.centerx if enemy.rect.left > projectile.circle_hitbox.centerx else 0
+            dx = max(dx, projectile.circle_hitbox.centerx - enemy.rect.right)
+            dy = enemy.rect.top - projectile.circle_hitbox.centery if enemy.rect.top > projectile.circle_hitbox.centery else 0
+            dy = max(dy, projectile.circle_hitbox.centery - enemy.rect.bottom)
+            distance = (dx**2 + dy**2) ** 0.5
+            if distance < projectile.radius:
+                if projectile.damage > max_damage:
+                    max_damage = projectile.damage
+                    max_enemy = enemy
+
+        if max_damage > 0 and max_enemy is not None:
+            max_enemy.damaged(max_damage, projectile)
+            
+def detect_collisions2(): #tracking projectiles
+    game_area = (0, 0, current_map.width, current_map.height)
+    projectile_quadtree = Index(bbox=game_area, max_items = 50)
+    for projectile in current_map.camera_group.projectile_group:
+        projectile_quadtree.insert(projectile, projectile.rect)
+
+    print(f' projectiles: {len(current_map.camera_group.projectile_group)}')
+    for enemy in current_map.camera_group.enemy_group:
+        if enemy.is_damaged: 
+            continue
+
+        nearby_projectiles = projectile_quadtree.intersect(enemy.rect)
         max_damage = 0
         max_projectile = None
-        for projectile in projectiles:
-            if projectile.damage > max_damage:
-                max_damage = projectile.damage
-                max_projectile = projectile
-        
-        if not enemy.is_damaged and max_projectile is not None:
-            max_projectile.collide()
-            enemy.damaged(max_damage)
+        for projectile in nearby_projectiles:
+            dx = enemy.rect.left - projectile.circle_hitbox.centerx if enemy.rect.left > projectile.circle_hitbox.centerx else 0
+            dx = max(dx, projectile.circle_hitbox.centerx - enemy.rect.right)
+            dy = enemy.rect.top - projectile.circle_hitbox.centery if enemy.rect.top > projectile.circle_hitbox.centery else 0
+            dy = max(dy, projectile.circle_hitbox.centery - enemy.rect.bottom)
+            distance = (dx**2 + dy**2) ** 0.5
+            if distance < projectile.radius:
+                if projectile.damage > max_damage:
+                    max_damage = projectile.damage
+                    max_projectile = projectile
+
+        if max_damage > 0:
+            enemy.damaged(max_damage, max_projectile)
+
+def start_map():
+    global current_map
+    for i in range(5):
+        pygame.time.set_timer(100 + i, 0)
+    current_map = CurrentMap(MAPS["1"], 1)
+    set_gamestate("gameplay")
 
 async def game_loop(framerate_limit=30):
-    loop = asyncio.get_event_loop()
-    next_frame_target = 0.0
-    limit_frame_duration = (1.0 / framerate_limit)
+    clock = pygame.time.Clock()
     menu_rendered = False
+    loop = asyncio.get_event_loop()
     while True:
-        if limit_frame_duration:  
-            this_frame = time.time()
-            delay = next_frame_target - this_frame
-            if delay > 0:
-                await asyncio.sleep(delay)
-            next_frame_target = this_frame + limit_frame_duration
-
+        clock.tick(framerate_limit)
         if game_state == "gameplay":
             screen.fill(current_map.ground_fill)
             current_map.camera_group.custom_draw(current_map.player)
@@ -413,20 +569,24 @@ async def game_loop(framerate_limit=30):
             current_map.map_ui()
             menu_rendered = False
 
-        elif game_state in ("paused", "levelup", "mainmenu", "mapend"):
+        elif game_state in ("paused", "levelup", "mainmenu", "mapend", "titlescreen"):
             if not menu_rendered:
-                screen.fill(current_map.ground_fill)
-                current_map.camera_group.custom_draw(current_map.player)
-                current_map.map_ui()
-                if game_state == "levelup":
-                    current_map.levelup_ui()
-                elif game_state == "paused":
-                    current_map.pause_ui()
-                elif game_state == "mainmenu":
-                    current_map.mainmenu_ui()
-                elif game_state == "mapend":
-                    current_map.end_ui()
-                menu_rendered = True
+                if game_state not in ("mainmenu", "titlescreen"):
+                    screen.fill(current_map.ground_fill)
+                    current_map.camera_group.custom_draw(current_map.player)
+                    current_map.map_ui()
+                    if game_state == "levelup":
+                        current_map.levelup_ui()
+                    elif game_state == "paused":
+                        current_map.pause_ui()
+                    elif game_state == "mapend":
+                        current_map.end_ui()
+                    menu_rendered = True
+                else:
+                    if game_state == "titlescreen":
+                        game.title_screen_ui()
+                    elif game_state == "mainmenu":
+                        current_map.mainmenu_ui()
 
         events_to_handle = list(pygame.event.get())
         events_handled = loop.create_task(handle_events(events_to_handle))
@@ -434,94 +594,118 @@ async def game_loop(framerate_limit=30):
         await events_handled
 
 async def handle_events(events_to_handle):
-    box1_rect = pygame.Rect(40, 100, 200, 300)
-    box2_rect = pygame.Rect(290, 100, 200, 300)
-    box3_rect = pygame.Rect(540, 100, 200, 300)
-    box4_rect = pygame.Rect(790, 100, 200, 300)
-    box5_rect = pygame.Rect(1040, 100, 200, 300)
-    if game_state == "paused":
-        box1_rect = pygame.Rect(480, 555, 150,50)
-        box2_rect = pygame.Rect(650, 555, 150, 50)
-
     for event in events_to_handle:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
-        if current_map is not None:
-            if game_state == "gameplay":
-                if event.type == pygame.USEREVENT:
-                    wave_spawn()
-
-                if event.type == 98:
-                    current_map.player.heal(current_map.player.modifiers["health_regen"])
-
-                if event.type == 99:
-                    current_map.player.invincible = False
-                    current_map.player.state = "idle"
-                    pygame.time.set_timer(99, 0)
-
-                if event.type in range(100, 100 + len(WEAPONS)):
-                    cast_type = WEAPONS[current_map.player.weapons[event.type - 100][0]]["type"]
-                    if cast_type == "projectile":
-                        current_map.player.cast_projectile(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
-                                                current_map.player.weapons[event.type - 100][1], 
-                                                [current_map.camera_group, 
-                                                    current_map.camera_group.projectile_group])
-                    elif cast_type == "orb":
-                        if len(current_map.camera_group.orb_group) == 0:
-                            current_map.player.cast_orb(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
-                                                    current_map.player.weapons[event.type - 100][1], 
-                                                    [current_map.camera_group, 
-                                                        current_map.camera_group.projectile_group, 
-                                                        current_map.camera_group.orb_group])
-                        
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        set_gamestate("paused")
-
-                    if event.key == pygame.K_1:
-                        current_map.spawn_mult += 1
+        if game_state == "titlescreen":
+            if event.type == pygame.KEYDOWN:
+                set_gamestate("gameplay")
                 
-                    if event.key == pygame.K_2:
-                        current_map.player.collect("experience", {"value": 999})
+        elif game_state == "gameplay":
+            if event.type == pygame.USEREVENT:
+                wave_spawn()
+
+            if event.type == 98:
+                current_map.player.heal(current_map.player.modifiers["health_regen"])
+
+            if event.type == 99:
+                current_map.player.invincible = False
+                current_map.player.state = "idle"
+                pygame.time.set_timer(99, 0)
+
+            if event.type in range(100, 100 + len(WEAPONS)):
+                cast_type = WEAPONS[current_map.player.weapons[event.type - 100][0]]["type"]
+                if cast_type == "projectile":
+                    current_map.player.cast_projectile(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
+                                            current_map.player.weapons[event.type - 100][1], 
+                                            [current_map.camera_group,
+                                                current_map.camera_group.projectile_group])
+                elif cast_type == "orb":
+                    if len(current_map.camera_group.orb_group) == 0:
+                        current_map.player.cast_orb(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
+                                                current_map.player.weapons[event.type - 100][1], 
+                                                [current_map.camera_group,
+                                                    current_map.camera_group.projectile_group,
+                                                    current_map.camera_group.orb_group])
+                elif cast_type == "aura":
+                    if len(current_map.camera_group.aura_group) == 0:
+                        current_map.player.cast_aura(WEAPONS[current_map.player.weapons[event.type - 100][0]], 
+                                                    current_map.player.weapons[event.type - 100][1],
+                                                    [current_map.camera_group,
+                                                        current_map.camera_group.projectile_group,
+                                                        current_map.camera_group.aura_group])
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    set_gamestate("paused")
+                if event.key == pygame.K_1:
+                    current_map.spawn_mult += 1
+                if event.key == pygame.K_2:
+                    current_map.player.collect("experience", {"value": 999})
+                if event.key == pygame.K_3:
+                    current_map.spawn_pickup((current_map.player.rect.centerx - 300, current_map.player.rect.centery - 300), "chest")
+                if event.key == pygame.K_4:
+                    start_map()
+                    return
+                if event.key == pygame.K_5:
+                    game.save()
+                if event.key == pygame.K_6:
+                    game.load()
                     
-                    if event.key == pygame.K_3:
-                        current_map.spawn_pickup((SCREEN_WIDTH // 3, SCREEN_HEIGHT // 3), "chest")
-                        
-            elif game_state == "paused":
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_0:
-                        set_gamestate("gameplay")
-                        
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    if box1_rect.collidepoint(mouse_x, mouse_y):
-                        set_gamestate("gameplay")
-                    elif box2_rect.collidepoint(mouse_x, mouse_y):
-                        pygame.quit()
-                        sys.exit()
-            
-            elif game_state == "levelup":
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    if box1_rect.collidepoint(mouse_x, mouse_y):
-                        current_map.level_up(current_map.choices[0])
-                    elif box2_rect.collidepoint(mouse_x, mouse_y):
-                        current_map.level_up(current_map.choices[1]) 
-                    elif box3_rect.collidepoint(mouse_x, mouse_y):
-                        current_map.level_up(current_map.choices[2])
-                    elif box4_rect.collidepoint(mouse_x, mouse_y):
-                        current_map.level_up(current_map.choices[3])
-                    elif box5_rect.collidepoint(mouse_x, mouse_y):
-                        current_map.level_up(current_map.choices[4])
-                    else:
-                        continue
+        elif game_state == "paused":
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    set_gamestate("gameplay")
+                    
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if box1_rect_paused.collidepoint(mouse_x, mouse_y):
+                    set_gamestate("gameplay")
+                elif box2_rect_paused.collidepoint(mouse_x, mouse_y):
+                    pygame.quit()
+                    sys.exit()
+        
+        elif game_state == "levelup":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if box1_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[0])
+                elif box2_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[1]) 
+                elif box3_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[2])
+                elif box4_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[3])
+                elif box5_rect.collidepoint(mouse_x, mouse_y):
+                    current_map.level_up(current_map.choices[4])
+                else:
+                    continue
+                
+        elif game_state == "mapend":
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if box1_rect.collidepoint(mouse_x, mouse_y):
+                    start_map()
+                    return
+                elif box2_rect.collidepoint(mouse_x, mouse_y):
+                    pygame.quit()
+                    sys.exit()
 
 if __name__ == "__main__":
     pygame.init()
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     event_handler = ...
-    game_state = "gameplay"
+    game_state = "titlescreen"
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),flags=pygame.SCALED, vsync=1)
+    box1_rect = pygame.Rect(40, 100, 200, 300)
+    box2_rect = pygame.Rect(290, 100, 200, 300)
+    box3_rect = pygame.Rect(540, 100, 200, 300)
+    box4_rect = pygame.Rect(790, 100, 200, 300)
+    box5_rect = pygame.Rect(1040, 100, 200, 300)
+    box1_rect_paused = pygame.Rect(480, 555, 150,50)
+    box2_rect_paused = pygame.Rect(650, 555, 150, 50)
     current_map = CurrentMap(MAPS["1"], 1)
+    game = Game()
     asyncio.run(game_loop(120))
