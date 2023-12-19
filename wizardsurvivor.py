@@ -504,21 +504,12 @@ def detect_collisions(): #tracking enemies
     
     for projectile in current_map.camera_group.projectile_group:
         nearby_enemies = enemy_quadtree.intersect(projectile.rect)
-        max_damage = 0
-        max_enemy = None
         for enemy in nearby_enemies:
-            dx = enemy.rect.left - projectile.circle_hitbox.centerx if enemy.rect.left > projectile.circle_hitbox.centerx else 0
-            dx = max(dx, projectile.circle_hitbox.centerx - enemy.rect.right)
-            dy = enemy.rect.top - projectile.circle_hitbox.centery if enemy.rect.top > projectile.circle_hitbox.centery else 0
-            dy = max(dy, projectile.circle_hitbox.centery - enemy.rect.bottom)
-            distance = (dx**2 + dy**2) ** 0.5
-            if distance < projectile.radius:
-                if projectile.damage > max_damage:
-                    max_damage = projectile.damage
-                    max_enemy = enemy
-
-        if max_damage > 0 and max_enemy is not None:
-            max_enemy.damaged(max_damage, projectile)
+            if enemy.rect.colliderect(projectile.rect):
+                if enemy.is_damaged:
+                    continue
+                else:
+                    enemy.damaged(projectile.damage, projectile)
             
 def detect_collisions2(): #tracking projectiles
     game_area = (0, 0, current_map.width, current_map.height)
